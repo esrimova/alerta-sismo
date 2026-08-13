@@ -1,0 +1,25 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!-- Sostiene el procesador despierto durante la ventana de medida. Sin esto,
+       los sensores sin variante wake-up dejan de entregar muestras cuando la
+       pantalla se apaga y la ventana se queda a medias. -->
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <!-- required=false a proposito: sin acelerometro la app pierde la medida
+       local pero sigue sirviendo con el feed y con la alerta de Google, asi
+       que no hay razon para impedir que se instale. -->
+  <uses-feature android:name="android.hardware.sensor.accelerometer"
+                android:required="false" />
+  <uses-feature android:name="android.hardware.sensor.gyroscope"
+                android:required="false" />
+
+  <application>
+    <!-- Puerta nativa para que el servicio que escucha las alertas de Google
+         arranque la medida sin pasar por JavaScript. exported="false": solo
+         codigo de esta app puede accionarlo, nunca una app ajena. -->
+    <receiver
+      android:name="expo.modules.sismografo.ArranqueReceiver"
+      android:exported="false" />
+  </application>
+
+</manifest>

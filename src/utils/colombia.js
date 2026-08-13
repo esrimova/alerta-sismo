@@ -1,0 +1,23 @@
+export const COLOMBIA_CITIES = [
+  { label: 'Todo el país', value: 'ALL', lat: 4.5709, lon: -74.2973 },
+  { label: 'Bogotá D.C. - Bogotá', value: 'Bogotá', lat: 4.6097, lon: -74.0817 },
+  { label: 'Antioquia - Medellín', value: 'Medellín', lat: 6.2442, lon: -75.5812 },
+  { label: 'Valle del Cauca - Cali', value: 'Cali', lat: 3.4516, lon: -76.5320 },
+  { label: 'Atlántico - Barranquilla', value: 'Barranquilla', lat: 10.9685, lon: -74.7813 },
+  { label: 'Bolívar - Cartagena', value: 'Cartagena', lat: 10.3910, lon: -75.4794 },
+  { label: 'Santander - Bucaramanga', value: 'Bucaramanga', lat: 7.1254, lon: -73.1198 },
+  { label: 'Norte de Santander - Cúcuta', value: 'Cúcuta', lat: 7.8939, lon: -72.5078 },
+  { label: 'Risaralda - Pereira', value: 'Pereira', lat: 4.8133, lon: -75.6961 },
+  { label: 'Magdalena - Santa Marta', value: 'Santa Marta', lat: 11.2408, lon: -74.1990 },
+  { label: 'Tolima - Ibagué', value: 'Ibagué', lat: 4.4389, lon: -75.2322 },
+  { label: 'Nariño - Pasto', value: 'Pasto', lat: 1.2136, lon: -77.2811 },
+  { label: 'Caldas - Manizales', value: 'Manizales', lat: 5.0681, lon: -75.5173 },
+  { label: 'Huila - Neiva', value: 'Neiva', lat: 2.9273, lon: -75.2819 },
+  { label: 'Meta - Villavicencio', value: 'Villavicencio', lat: 4.1420, lon: -73.6266 },
+  { label: 'Quindío - Armenia', value: 'Armenia', lat: 4.5339, lon: -75.6811 },
+  { label: 'Cauca - Popayán', value: 'Popayán', lat: 2.4382, lon: -76.6132 },
+  { label: 'Cesar - Valledupar', value: 'Valledupar', lat: 10.4631, lon: -73.2532 },
+  { label: 'Boyacá - Tunja', value: 'Tunja', lat: 5.5353, lon: -73.3678 },
+  { label: 'Sucre - Sincelejo', value: 'Sincelejo', lat: 9.3047, lon: -75.3978 },
+  { label: 'Chocó - Quibdó', value: 'Quibdó', lat: 5.6947, lon: -76.6611 }
+];

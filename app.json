@@ -1,17 +1,38 @@
 {
   "expo": {
-    "name": "temp_app",
-    "slug": "temp_app",
+    "name": "Alerta Sismo",
+    "slug": "alerta-sismo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.esrimova.alertasismo",
+      "permissions": [
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
+        "CAMERA",
+        "FLASHLIGHT",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_DATA_SYNC",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "blockedPermissions": [
+        "android.permission.SEND_SMS",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#1E293B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -19,6 +40,32 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1E293B"
+        }
+      ],
+      [
+        "expo-background-fetch",
+        {}
+      ],
+      "expo-audio",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "targetSdkVersion": 34,
+            "compileSdkVersion": 36
+          }
+        }
+      ],
+      "react-native-notify-kit",
+      "./plugins/withForegroundServiceType",
+      "./plugins/withPantallaBloqueo"
+    ]
   }
 }

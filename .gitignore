@@ -39,3 +39,18 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Claude Code (artefactos de sesion local)
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+
+# APKs compilados (respaldos locales)
+apk-versiones/
+
+# Fork de bitchat: es un repositorio aparte y GPL v3. Meterlo aqui arrastraria
+# toda la app a GPL. La integracion es por IPC entre dos apps separadas.
+bitchat-android/
+
+# Salida de compilacion de los modulos nativos
+modules/*/android/build/
+modules/*/android/.gradle/

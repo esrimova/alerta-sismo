@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!-- Baliza BLE. ADVERTISE y CONNECT son de Android 12+; los dos primeros
+       cubren versiones anteriores. neverForLocation evita que Android exija
+       permiso de ubicacion precisa por usar Bluetooth. -->
+  <uses-permission android:name="android.permission.BLUETOOTH"
+                   android:maxSdkVersion="30" />
+  <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+                   android:maxSdkVersion="30" />
+  <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"
+                   android:usesPermissionFlags="neverForLocation" />
+  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+</manifest>

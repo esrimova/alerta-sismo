@@ -1,0 +1,26 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <application>
+    <!--
+      Servicio de escucha de notificaciones.
+
+      El permiso BIND_NOTIFICATION_LISTENER_SERVICE lo exige Android y solo lo
+      concede el sistema: obliga a que sea el propio Android quien vincule el
+      servicio, nunca otra app.
+
+      exported="true" es OBLIGATORIO aqui, y no es un agujero: sin el, el
+      sistema no puede vincularlo y el servicio nunca recibe nada. El permiso
+      de arriba es lo que impide que lo vincule nadie mas.
+    -->
+    <service
+      android:name="expo.modules.escuchaalertas.EscuchaNotificaciones"
+      android:label="Alertas sísmicas de Google"
+      android:exported="true"
+      android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+      <intent-filter>
+        <action android:name="android.service.notification.NotificationListenerService" />
+      </intent-filter>
+    </service>
+  </application>
+
+</manifest>

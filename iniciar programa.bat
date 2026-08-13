@@ -1,0 +1,3 @@
+@echo off
+echo Iniciando simulador web de Alerta Sismo...
+npx expo start --web -c
