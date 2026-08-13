@@ -162,6 +162,16 @@ export function recortarBaliza(texto) {
   return corte;
 }
 
+/** Hora de reloj, en el formato que se usa hablando: "4:15 p. m.". */
+function horaDe(ts) {
+  if (!ts) return null;
+  try {
+    return new Date(ts).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+  } catch (e) {
+    return null;
+  }
+}
+
 /** Duración legible en palabras, para quien lee con prisa. */
 function haceCuanto(ms) {
   if (!ms || ms < 0) return null;
@@ -198,10 +208,16 @@ export function componerFicha(cfg, estado, ubicacion = null, red = null) {
   // no significa nada para alguien que acaba de instalar una app para ayudar:
   // obliga a descifrar cómo funciona la app antes de entender que hay una
   // persona en problemas.
+  // La hora exacta desde la que el usuario no responde. Se dice en reloj y no
+  // solo en "hace tanto" porque quien lee puede cruzarla con lo que sabe: a qué
+  // hora fue el sismo, a qué hora se cayó la luz, cuándo habló con él por
+  // última vez. Un "hace 2 horas" no se cruza con nada.
+  const desdeHora = horaDe(estado?.activadaEn);
   const quien = nombre ? `Soy ${nombre} y necesito ayuda.` : 'Necesito ayuda.';
   bloques.push(
-    `${quien} Es posible que esté inconsciente o atrapado: este mensaje lo ` +
-    'envió mi teléfono por su cuenta, al ver que yo no respondía.'
+    `${quien} Es posible que esté inconsciente o atrapado` +
+    (desdeHora ? ` desde las ${desdeHora}` : '') +
+    ': este mensaje lo envió mi teléfono por su cuenta, al ver que yo no respondía.'
   );
 
   // DÓNDE ESTOY va primero: es lo que decide si quien lee puede hacer algo.
