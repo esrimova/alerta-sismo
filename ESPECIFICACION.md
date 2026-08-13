@@ -281,7 +281,9 @@ Hay que **añadir un servicio exportado** al fork, protegido con permiso de firm
 
 Se enciende al vencer el protocolo de emergencia y se apaga al pulsar "Estoy bien", que además hace que el fork borre la ficha. Ese botón **termina la emergencia en el acto** y la app vuelve a su modo normal de monitoreo; la malla se corta en seco y es lo correcto: si el usuario ya dijo estar bien, no hay nada que seguir difundiendo.
 
-El fork lleva además un **plazo máximo de encendido** (6 horas por defecto). Es un interruptor de seguridad, no una preferencia: si Alerta Sismo muriera sin llegar a dar la orden de apagado, bitchat se quedaría escaneando indefinidamente. Se programa con `AlarmManager` porque un plazo de horas tiene que sobrevivir justo al escenario del que protege.
+**No hay plazo máximo, y es deliberado.** La malla vive exactamente lo que viva la baliza. Un tope de horas parecía prudente frente a que Alerta Sismo muriera sin apagarla, pero apagar la malla mientras el usuario sigue atrapado es peor que dejarla encendida de más: se corta el canal justo cuando todavía puede llegar alguien, y la batería ya impone su propio límite.
+
+**bitchat tampoco arranca la malla por su cuenta.** El original la levantaba al iniciar el proceso, al encender el teléfono y al tocar una notificación, de modo que cualquier cosa que despertara la app la dejaba escaneando sin que nadie lo hubiera pedido. Aquí esos tres caminos exigen que haya una emergencia activa, lo que además cubre el caso de que el sistema mate el proceso a media emergencia y haya que reanudar.
 
 **El fork no pide ubicación permanente.** Se retiraron la ubicación de segundo plano y la precisa, y se declara `neverForLocation` en el escaneo Bluetooth: desde Android 12 basta con afirmar que no se deduce la posición a partir de los resultados, que aquí es cierto porque solo se descubren dispositivos. Pedir seguimiento continuo para algo que vive minutos al año es pedir mucho más de lo que se devuelve.
 
@@ -357,7 +359,7 @@ Nada queda encendido "por si acaso". El reparto es este:
 | Ventana de medida a 100 Hz | Solo tras un disparo, y acotada en segundos |
 | Vigilancia de réplicas a 5 Hz | Solo tras una alerta roja, y con el sensor acumulando en tandas |
 | Escucha de la alerta de Google | Siempre, pero la vincula el sistema y solo despierta cuando llega una notificación |
-| Malla de bitchat | Solo durante la emergencia, con plazo máximo de encendido |
+| Malla de bitchat | Solo durante la emergencia: se enciende con la baliza y se apaga con "Estoy bien" |
 | Baliza Bluetooth | Solo durante la emergencia |
 | Baliza sonora | Solo durante la emergencia, y espaciándose con el tiempo |
 | Lectura del GPS | Solo al abrir la app, como mucho cada 12 h |

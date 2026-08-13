@@ -81,13 +81,7 @@ object PuenteMalla {
    * Alerta Sismo, que es la que sabe si el usuario esta en su casa y cuanta
    * bateria le queda. bitchat solo la reenvia tal cual.
    */
-  fun activar(
-    contexto: Context,
-    ficha: String,
-    apodo: String,
-    episodio: String,
-    duracionMs: Double
-  ): Map<String, Any?> {
+  fun activar(contexto: Context, ficha: String, apodo: String, episodio: String): Map<String, Any?> {
     if (ficha.isBlank()) {
       return mapOf("ok" to false, "motivo" to "ficha_vacia")
     }
@@ -96,10 +90,6 @@ object PuenteMalla {
       putExtra("ficha", ficha)
       putExtra("apodo", apodo)
       putExtra("episodio", episodio)
-      // Cuanto puede estar encendida. Si Alerta Sismo muriera sin dar la orden
-      // de apagado, la malla se apaga sola al vencer este plazo en vez de
-      // seguir escaneando por Bluetooth indefinidamente.
-      putExtra("duracionMs", duracionMs.toLong())
     }
     return lanzar(contexto, intent, "activar")
   }
