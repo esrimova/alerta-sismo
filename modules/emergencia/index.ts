@@ -85,8 +85,13 @@ export function estadoMalla(): EstadoMalla {
  * mantener la malla viva gastaría batería sin parar para cubrir un evento que
  * puede no ocurrir en años.
  */
-export function activarMalla(ficha: string, apodo: string, episodio: string): Resultado {
-  return Emergencia.activarMalla(ficha, apodo, episodio);
+export function activarMalla(
+  ficha: string,
+  apodo: string,
+  episodio: string,
+  duracionMs: number
+): Resultado {
+  return Emergencia.activarMalla(ficha, apodo, episodio, duracionMs);
 }
 
 /** Apaga la malla y borra la ficha del otro lado. */

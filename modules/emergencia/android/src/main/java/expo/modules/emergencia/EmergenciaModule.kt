@@ -167,8 +167,8 @@ class EmergenciaModule : Module() {
      * mantener la malla viva gastaria bateria sin parar para cubrir un evento
      * que puede no ocurrir en años.
      */
-    Function("activarMalla") { ficha: String, apodo: String, episodio: String ->
-      PuenteMalla.activar(contexto, ficha, apodo, episodio)
+    Function("activarMalla") { ficha: String, apodo: String, episodio: String, duracionMs: Double ->
+      PuenteMalla.activar(contexto, ficha, apodo, episodio, duracionMs)
     }
 
     /** Apaga la malla y borra la ficha del otro lado. */

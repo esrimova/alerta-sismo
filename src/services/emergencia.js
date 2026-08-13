@@ -36,6 +36,9 @@ const ESTADO_KEY = 'alerta_sismo_emergencia_estado_v1';
 
 export const MINUTOS_ESPERA_DEFECTO = 60;
 
+/** Cuantas horas se deja viva la malla si nadie la apaga antes. */
+export const HORAS_MALLA_DEFECTO = 6;
+
 export const CONFIG_DEFECTO = {
   activo: false,
   /** Nombre y apellido: quien lo lee no conoce al afectado. */
@@ -57,6 +60,8 @@ export const CONFIG_DEFECTO = {
    */
   contactos: [],
   minutosEspera: MINUTOS_ESPERA_DEFECTO,
+  /** Tope de horas que la malla puede quedarse encendida por su cuenta. */
+  horasMalla: HORAS_MALLA_DEFECTO,
   usarBluetooth: true,
   usarSonido: true,
   /**
@@ -293,7 +298,11 @@ async function encenderMalla(cfg, estado) {
     const red = await verificarInternet();
     const texto = componerFicha(cfg, estado, ubicacion, red);
     const episodio = String(estado?.activadaEn || Date.now());
-    const r = activarMalla(texto, textoDeBaliza(cfg), episodio);
+    // Cuanto puede quedarse encendida la malla sin que nadie la apague. Es un
+    // interruptor de seguridad: si esta app muriera, bitchat no puede quedarse
+    // escaneando por Bluetooth para siempre por un episodio ya terminado.
+    const horas = cfg.horasMalla ?? HORAS_MALLA_DEFECTO;
+    const r = activarMalla(texto, textoDeBaliza(cfg), episodio, horas * 3600000);
     return { ...r, enviadoEn: Date.now() };
   } catch (e) {
     return { ok: false, motivo: e?.message || 'excepcion' };
