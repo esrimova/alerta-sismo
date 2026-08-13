@@ -26,7 +26,7 @@ import {
   estadoMalla, activarMalla, desactivarMalla,
 } from '../../modules/emergencia';
 import { cargarUbicacionGuardada } from './location';
-import { estadoConexion } from './red';
+import { verificarInternet } from './red';
 import { SOUND_URLS } from './alert';
 import { registrarEvento, TIPO } from './bitacora';
 import { FICHA_DEFECTO, balizaPorDefecto, recortarBaliza, componerFicha, fichaTieneContenido } from './ficha';
@@ -40,6 +40,16 @@ export const CONFIG_DEFECTO = {
   activo: false,
   /** Nombre y apellido: quien lo lee no conoce al afectado. */
   miNombre: '',
+  /**
+   * El telefono del PROPIO usuario, no el de un contacto.
+   *
+   * Solo se ofrece cuando se ha confirmado que hay salida a internet, y sirve
+   * para que quien lo encuentre se pase a un canal mas estable que la malla:
+   * un mensaje por WhatsApp aguanta lo que una malla Bluetooth de varios saltos
+   * no aguanta. Sin internet no se muestra, porque mandar a alguien a escribir
+   * a un numero inalcanzable es peor que no darselo.
+   */
+  miTelefono: '',
   /**
    * Varios contactos, no uno. Si hay un sismo, el unico contacto podria estar
    * igual de incomunicado que el afectado: son vecinos o familia y comparten
@@ -280,7 +290,7 @@ async function encenderMalla(cfg, estado) {
     if (!fichaTieneContenido(cfg)) return { ok: false, motivo: 'ficha_vacia' };
 
     const ubicacion = await cargarUbicacionGuardada();
-    const red = await estadoConexion();
+    const red = await verificarInternet();
     const texto = componerFicha(cfg, estado, ubicacion, red);
     const episodio = String(estado?.activadaEn || Date.now());
     const r = activarMalla(texto, textoDeBaliza(cfg), episodio);

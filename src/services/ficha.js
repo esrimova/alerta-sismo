@@ -254,26 +254,15 @@ export function componerFicha(cfg, estado, ubicacion = null, red = null) {
     );
   }
 
-  // La conexion dice algo que ningun otro dato dice. Con internet y sin
-  // respuesta, el silencio no es de la red sino de la persona: nadie con
-  // cobertura deja de pedir ayuda porque si. Sin internet, la zona esta
-  // incomunicada y llamar a la familia tampoco va a servir.
-  if (red?.sabido) {
-    if (red.conectado) {
-      const via = red.tipo ? ` por ${red.tipo}` : '';
-      situacion.push(
-        `Mi teléfono SÍ tiene internet${via}. Que no responda no es falta de señal.`
-      );
-    } else {
-      situacion.push(
-        red.avion
-          ? 'Mi teléfono está en modo avión, así que no tengo internet.'
-          : 'Mi teléfono NO tiene internet. Puede que la zona esté incomunicada.'
-      );
-    }
-  }
-
   if (situacion.length) bloques.push(`SITUACIÓN\n${situacion.join('\n')}`);
+
+  // POR DONDE SEGUIR HABLANDO. No es un dato de color: es la instrucción más
+  // accionable del mensaje. Esta malla es Bluetooth de varios saltos y es
+  // frágil; si hay salida a internet, conviene pasarse a un canal que aguante.
+  // Y si no la hay, decirlo evita que quien ayuda pierda tiempo escribiendo a
+  // un número que no va a recibir nada.
+  const canal = componerCanal(cfg, red);
+  if (canal) bloques.push(`CÓMO SEGUIR EN CONTACTO\n${canal}`);
 
   const contactos = (cfg?.contactos || [])
     .filter((c) => String(c?.telefono || '').trim())
@@ -301,6 +290,49 @@ export function componerFicha(cfg, estado, ubicacion = null, red = null) {
   );
 
   return bloques.join('\n\n');
+}
+
+/**
+ * Qué decir sobre por dónde seguir hablando.
+ *
+ * Tres casos, y ninguno se puede colapsar en otro:
+ *
+ *  - CON internet: hay un canal mejor que este, y hay que ofrecerlo. Además
+ *    dice algo que no dice ningún otro dato: si el teléfono tiene salida y aun
+ *    así nadie responde, el silencio no es de la red sino de la persona.
+ *  - SIN internet: esta malla es lo único que queda. Decirlo evita que quien
+ *    ayuda pierda minutos escribiendo a un número inalcanzable.
+ *  - SIN SABER: no se afirma nada. Prometer un canal que quizá no exista, o
+ *    negar uno que quizá sí, son los dos errores caros.
+ */
+function componerCanal(cfg, red) {
+  if (!red?.verificado) return null;
+
+  const mio = String(cfg?.miTelefono || '').trim();
+
+  if (red.conectado) {
+    const lineas = [];
+    if (mio) {
+      lineas.push(
+        `Mi teléfono tiene internet. Escríbeme por WhatsApp al ${mio}: esa vía ` +
+        'aguanta mucho mejor que esta red y no depende de que sigas cerca.'
+      );
+    } else {
+      lineas.push('Mi teléfono tiene internet, así que puede recibir mensajes.');
+    }
+    lineas.push(
+      'Que no responda no es falta de señal: es que no puedo contestar.'
+    );
+    return lineas.join('\n');
+  }
+
+  if (red.avion) {
+    return 'Mi teléfono está en modo avión, así que esta red es el único canal por el que me llega algo.';
+  }
+  return (
+    'Mi teléfono no tiene internet, así que esta red es el único canal por el ' +
+    'que me llega algo. No pierdas tiempo escribiéndome por otro lado.'
+  );
 }
 
 /**

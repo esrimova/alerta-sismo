@@ -29,7 +29,7 @@ import {
   alMedir, cargarUltimaMedicion, mmiRomano, describirMmi, VENTANAS_SEG,
 } from '../services/sismografo';
 import { estadoEscucha, abrirAjustesEscucha } from '../services/escucha';
-import { estadoConexion } from '../services/red';
+import { verificarInternet } from '../services/red';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Colores del destello segun lo configurado por el usuario.
@@ -198,7 +198,7 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
     }
     // Se simula "activado justo ahora" para que se vea la sección de situación.
     const simulado = { activadaEn: Date.now() };
-    const red = await estadoConexion();
+    const red = await verificarInternet();
     Alert.alert('Así lo recibirá', componerFicha(emerg, simulado, ubicacion, red));
   };
 
@@ -690,6 +690,22 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
             <Text style={styles.endpointTexto}>
               Con apellido: quien te encuentre no te conoce, y un nombre suelto no le
               sirve para dar razón de ti a nadie.
+            </Text>
+
+            <Text style={[styles.label, { marginTop: 20 }]}>Mi WhatsApp</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="phone-pad"
+              value={emerg.miTelefono}
+              onChangeText={(v) => actualizarEmerg('miTelefono', v)}
+              placeholder="3001234567"
+              placeholderTextColor="#64748B"
+            />
+            <Text style={styles.endpointTexto}>
+              Este sí es el tuyo. Solo se envía cuando la app comprueba que tu teléfono
+              tiene salida a internet, para que quien te encuentre se pase a un canal
+              más estable que la malla Bluetooth. Sin internet no se muestra: mandarlo
+              a escribir a un número inalcanzable le haría perder tiempo.
             </Text>
 
             {renderContactos()}
