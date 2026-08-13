@@ -244,12 +244,30 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
           onPress: async () => {
             const r = await activarProtocolo();
             setEstadoEmerg(await cargarEstadoEmergencia());
-            const okBt = r.bluetooth?.ok;
+
+            // Se informa de los TRES mecanismos, no solo del Bluetooth. La malla
+            // puede fallar en silencio por motivos que el usuario no puede
+            // adivinar —ficha vacía, fork no instalado, permiso de firma— y sin
+            // esto la prueba parecía correcta mientras no enviaba nada.
+            const lineas = [];
+            lineas.push(r.bluetooth?.ok
+              ? `✅ Baliza Bluetooth: visible como "${r.bluetooth.nombre}"`
+              : `❌ Baliza Bluetooth: ${r.bluetooth?.motivo || 'no se activó'}`);
+            lineas.push(r.sonido ? '✅ Baliza sonora: activa' : '❌ Baliza sonora: desactivada');
+
+            const m = r.malla || {};
+            lineas.push(m.ok
+              ? '✅ Malla: encendida y ficha entregada a bitchat'
+              : `❌ Malla: ${{
+                  ficha_vacia: 'tu ficha está vacía. Llénala en "Editar la ficha"',
+                  bitchat_no_instalado: 'bitchat no está instalado',
+                  bitchat_sin_puente: 'el bitchat instalado no es el fork con el puente',
+                  sin_permiso_firma: 'las dos apps no comparten clave de firma',
+                }[m.motivo] || m.motivo || 'no se encendió'}`);
+
             Alert.alert(
-              okBt ? 'Baliza activa' : 'La baliza falló',
-              okBt
-                ? `Visible como "${r.bluetooth.nombre}". Búscala desde otro teléfono y luego pulsa ESTOY BIEN para apagarla.`
-                : `Motivo: ${r.bluetooth?.motivo || 'desconocido'}`
+              r.bluetooth?.ok && m.ok ? 'Protocolo activo' : 'Protocolo activo con fallos',
+              `${lineas.join('\n\n')}\n\nPulsa ESTOY BIEN para apagarlo todo.`
             );
           },
         },
@@ -1187,7 +1205,6 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
           <Text style={styles.checkboxLabel}>Sonido</Text>
           {config.soundEnabled && (
             <Picker selectedValue={config.soundTone} onValueChange={(val) => updateAlertSetting(level, 'soundTone', val)} style={styles.picker}>
-              <Picker.Item label="Sirena Fuerte" value="sirena_fuerte" />
               <Picker.Item label="Ambulancia" value="sirena_ambulancia" />
               <Picker.Item label="Alarma Espacial" value="alarma_espacial" />
               <Picker.Item label="Campana" value="campana" />

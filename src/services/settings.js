@@ -9,7 +9,7 @@ export const DEFAULT_SETTINGS = {
   alerts: {
     red: {
       soundEnabled: true,
-      soundTone: 'sirena_fuerte',
+      soundTone: 'sirena_ambulancia',
       lightEnabled: true,
       lightColor: 'red',
       torchEnabled: true,
@@ -66,6 +66,24 @@ export const DEFAULT_SETTINGS = {
 
 const SETTINGS_KEY = 'alerta_sismo_settings_v2';
 
+/**
+ * Tonos retirados del catalogo y por cual se sustituyen.
+ *
+ * 'sirena_fuerte' era un tono corto en bucle que sonaba a alarma de
+ * electrodomestico: molesto sin ser reconocible como emergencia. Sin este
+ * traspaso, quien lo tuviera elegido se quedaba apuntando a un sonido que ya no
+ * existe, y la alerta sonaria con el respaldo sin que el usuario entendiera por
+ * que le cambio.
+ */
+const TONOS_RETIRADOS = {
+  sirena_fuerte: 'sirena_ambulancia',
+};
+
+function conTonoVigente(nivel) {
+  const reemplazo = TONOS_RETIRADOS[nivel.soundTone];
+  return reemplazo ? { ...nivel, soundTone: reemplazo } : nivel;
+}
+
 export async function loadSettings() {
   try {
     const data = await AsyncStorage.getItem(SETTINGS_KEY);
@@ -82,9 +100,9 @@ export async function loadSettings() {
         location: parsed.location ?? DEFAULT_SETTINGS.location,
         autoLocation: parsed.autoLocation ?? DEFAULT_SETTINGS.autoLocation,
         alerts: {
-          red: { ...DEFAULT_SETTINGS.alerts.red, ...(parsed.alerts?.red || {}) },
-          orange: { ...DEFAULT_SETTINGS.alerts.orange, ...naranjaGuardada },
-          yellow: { ...DEFAULT_SETTINGS.alerts.yellow, ...(parsed.alerts?.yellow || {}) }
+          red: conTonoVigente({ ...DEFAULT_SETTINGS.alerts.red, ...(parsed.alerts?.red || {}) }),
+          orange: conTonoVigente({ ...DEFAULT_SETTINGS.alerts.orange, ...naranjaGuardada }),
+          yellow: conTonoVigente({ ...DEFAULT_SETTINGS.alerts.yellow, ...(parsed.alerts?.yellow || {}) })
         },
         api: { ...DEFAULT_SETTINGS.api, ...(parsed.api || {}) },
         sensor: { ...DEFAULT_SETTINGS.sensor, ...(parsed.sensor || {}) }

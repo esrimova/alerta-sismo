@@ -260,11 +260,21 @@ const TRAMOS_SONIDO = [
  * Lo que dice la voz de la baliza.
  *
  * Es una INSTRUCCION, no una queja. Quien oye esto no sabe que hacer con la
- * informacion de que hay alguien atrapado; si sabe que hacer con "enciende el
- * Bluetooth", porque eso lo lleva a la baliza BLE, que dice donde esta el
- * afectado y por que canal se sabe el resto.
+ * informacion de que hay alguien atrapado; si sabe que hacer con "instala
+ * bitchat", porque por ahi llega la ficha con quien es, donde esta y que le
+ * pasa.
+ *
+ * El nombre sale de la configuracion y no esta fijado en el codigo: la app se
+ * instala en telefonos de familiares, y una voz que grita el nombre equivocado
+ * es peor que una que no diga ninguno. Solo el nombre de pila, que es lo que se
+ * entiende a traves de una losa.
  */
-const FRASE_BALIZA = 'Auxilio. Activa el Bluetooth de tu teléfono para encontrarme.';
+function fraseBaliza(cfg) {
+  const nombre = String(cfg?.miNombre || '').trim().split(/\s+/)[0];
+  return nombre
+    ? `Auxilio. Soy ${nombre}. Instala bitchat para ayudarme.`
+    : 'Auxilio. Instala bitchat para ayudarme.';
+}
 
 /**
  * Que sirena acompaña a la voz.
@@ -373,7 +383,7 @@ function callarSirena() {
  * Cada tramo dura cinco segundos porque un pitido corto se confunde con
  * cualquier otra cosa entre los ruidos de un derrumbe.
  */
-function emitirBaliza(alTerminar, indice = 0) {
+function emitirBaliza(frase, alTerminar, indice = 0) {
   if (indice >= REPETICIONES) {
     callarSirena();
     if (alTerminar) alTerminar();
@@ -382,12 +392,12 @@ function emitirBaliza(alTerminar, indice = 0) {
   sonarSirena();
   pasoBaliza = setTimeout(() => {
     callarSirena();
-    try { hablar(FRASE_BALIZA); } catch (e) {}
-    pasoBaliza = setTimeout(() => emitirBaliza(alTerminar, indice + 1), DURACION_VOZ_MS);
+    try { hablar(frase); } catch (e) {}
+    pasoBaliza = setTimeout(() => emitirBaliza(frase, alTerminar, indice + 1), DURACION_VOZ_MS);
   }, DURACION_SIRENA_MS);
 }
 
-function iniciarSonido() {
+function iniciarSonido(cfg) {
   try {
     setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true });
   } catch (e) {}
@@ -397,13 +407,14 @@ function iniciarSonido() {
   detenerSonido();
 
   const desde = Date.now();
+  const frase = fraseBaliza(cfg);
   const cicloCompleto = () => {
     // La siguiente emision se programa cuando TERMINA la actual, no cuando
     // empieza. Cada emision dura media docena de segundos por repeticion, asi
     // que medir desde el arranque haria que se solaparan en el tramo mas rapido:
     // la sirena de la siguiente pisaria la voz de la anterior y no se entenderia
     // ninguna de las dos.
-    emitirBaliza(() => {
+    emitirBaliza(frase, () => {
       // Se recalcula aqui, no al empezar: asi la cadencia se va espaciando sola
       // conforme pasa el tiempo y baja la bateria.
       intervaloSonido = setTimeout(cicloCompleto, cadenciaSonido(desde));
@@ -516,7 +527,7 @@ export async function activarProtocolo() {
   }
 
   if (cfg.usarSonido) {
-    iniciarSonido();
+    iniciarSonido(cfg);
     resultado.sonido = true;
   }
 

@@ -10,7 +10,6 @@ let vibrationInterval = null;
 let audioModeReady = false;
 
 export const SOUND_URLS = {
-  sirena_fuerte: require('../assets/sounds/sirena_fuerte.ogg'),
   campana: require('../assets/sounds/campana.ogg'),
   alerta_precaucion: require('../assets/sounds/alerta_precaucion.ogg'),
   notificacion_simple: require('../assets/sounds/notificacion_simple.ogg'),
@@ -346,7 +345,7 @@ export const triggerAlert = async (level, event, settings, distanciaKm = null) =
 
   if (config.soundEnabled) {
     try {
-      const soundAsset = SOUND_URLS[config.soundTone] || SOUND_URLS.sirena_fuerte;
+      const soundAsset = SOUND_URLS[config.soundTone] || SOUND_URLS.sirena_ambulancia;
       await playAlarm(soundAsset, isLooping);
       acciones.sonido = config.soundTone;
     } catch (error) {
@@ -362,7 +361,7 @@ export const triggerForegroundAlert = async () => {
   startVibration(VIBRATION_PATTERNS.heavy, true);
   toggleTorch(true);
   try {
-    await playAlarm(SOUND_URLS.sirena_fuerte, true);
+    await playAlarm(SOUND_URLS.sirena_ambulancia, true);
   } catch (e) {
     console.error(e);
   }
