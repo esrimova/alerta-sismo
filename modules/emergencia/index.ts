@@ -114,3 +114,18 @@ export function subirVolumenBaliza(): Resultado & { previo?: number; maximo?: nu
 export function restaurarVolumen(): Resultado {
   return Emergencia.restaurarVolumen();
 }
+
+/**
+ * Dice una frase en voz alta, en español latinoamericano.
+ *
+ * Se usa el sintetizador de Android y no un archivo grabado: no engorda la app,
+ * no depende de internet, y permite cambiar la frase sin volver a grabar nada.
+ */
+export function hablar(texto: string): Resultado {
+  return Emergencia.hablar(texto);
+}
+
+/** ¿Puede este teléfono hablar? Para avisar antes de la emergencia. */
+export function puedeHablar(): { ok: boolean; listo: boolean } {
+  return Emergencia.puedeHablar();
+}

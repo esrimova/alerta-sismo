@@ -20,6 +20,11 @@
        la comprobacion de si bitchat esta instalado diria siempre que no. -->
   <queries>
     <package android:name="com.bitchat.droid" />
+    <!-- Android 11+ oculta los servicios instalados salvo que se declaren. Sin
+         esto, el sintetizador de voz no se encuentra y la baliza queda muda. -->
+    <intent>
+      <action android:name="android.intent.action.TTS_SERVICE" />
+    </intent>
   </queries>
 
 </manifest>

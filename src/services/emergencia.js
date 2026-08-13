@@ -24,7 +24,7 @@ import * as Notifications from 'expo-notifications';
 import {
   iniciarBaliza, detenerBaliza, estadoBluetooth,
   estadoMalla, activarMalla, desactivarMalla,
-  subirVolumenBaliza, restaurarVolumen, nivelBateria,
+  subirVolumenBaliza, restaurarVolumen, nivelBateria, hablar,
 } from '../../modules/emergencia';
 import { cargarUbicacionGuardada } from './location';
 import { verificarInternet } from './red';
@@ -234,6 +234,8 @@ export async function confirmarEstoyBien() {
 
 let reproductorSos = null;
 let intervaloSonido = null;
+/** Temporizador del paso actual dentro de una emision (sirena o voz). */
+let pasoBaliza = null;
 
 /**
  * Cada cuanto suena la baliza, segun lo que lleve activa.
@@ -255,6 +257,23 @@ const TRAMOS_SONIDO = [
 ];
 
 /**
+ * Lo que dice la voz de la baliza.
+ *
+ * Es una INSTRUCCION, no una queja. Quien oye esto no sabe que hacer con la
+ * informacion de que hay alguien atrapado; si sabe que hacer con "enciende el
+ * Bluetooth", porque eso lo lleva a la baliza BLE, que dice donde esta el
+ * afectado y por que canal se sabe el resto.
+ */
+const FRASE_BALIZA = 'Auxilio. Activa el Bluetooth de tu teléfono para encontrarme.';
+
+/** Cuantas veces se repite el par sirena + voz en cada emision. */
+const REPETICIONES = 3;
+
+/** Cuanto se deja sonar la sirena antes de hablar, y la voz antes de repetir. */
+const DURACION_SIRENA_MS = 5000;
+const DURACION_VOZ_MS = 5000;
+
+/**
  * Piso de cadencia segun la carga que queda.
  *
  * El tramo por tiempo da por hecho que se empieza con bateria. Si la emergencia
@@ -274,10 +293,10 @@ const TRAMOS_SONIDO = [
  * estorba; con bateria escasa se impone al reloj.
  */
 const TRAMOS_BATERIA = [
-  { desdePct: 80, minimoSeg: 0 },     // holgado: manda el tiempo
-  { desdePct: 60, minimoSeg: 120 },
-  { desdePct: 40, minimoSeg: 600 },
-  { desdePct: 0, minimoSeg: 1800 },
+  { desdePct: 80, minimoSeg: 0 },      // holgado: manda el tiempo
+  { desdePct: 60, minimoSeg: 300 },    // 5 min
+  { desdePct: 40, minimoSeg: 1800 },   // media hora
+  { desdePct: 0, minimoSeg: 3600 },    // una hora
 ];
 
 function minimoPorBateria() {
@@ -309,6 +328,54 @@ function cadenciaSonido(desdeMs) {
   return Math.max(tramo.cadaSeg * 1000, minimoPorBateria());
 }
 
+function sonarSirena() {
+  try {
+    if (reproductorSos) {
+      try { reproductorSos.remove(); } catch (e) {}
+    }
+    reproductorSos = createAudioPlayer(SOUND_URLS.sirena_fuerte);
+    reproductorSos.volume = 1.0;
+    reproductorSos.loop = true; // se corta por tiempo, no por duracion del clip
+    reproductorSos.play();
+  } catch (e) {
+    console.log('No se pudo emitir la sirena:', e);
+  }
+}
+
+function callarSirena() {
+  if (reproductorSos) {
+    try { reproductorSos.pause(); } catch (e) {}
+    try { reproductorSos.remove(); } catch (e) {}
+    reproductorSos = null;
+  }
+}
+
+/**
+ * Una emision de la baliza: sirena y voz, alternadas tres veces.
+ *
+ * POR QUE LAS DOS COSAS Y NO SOLO UNA. La sirena atraviesa mejor los escombros y
+ * se oye de lejos, pero no dice nada: quien la oye sabe que hay alguien y no
+ * sabe que hacer. La voz sí da una instruccion, pero se pierde antes con la
+ * distancia y el ruido. Alternadas, la sirena trae a la persona y la voz le dice
+ * que hacer cuando ya esta cerca.
+ *
+ * Cada tramo dura cinco segundos porque un pitido corto se confunde con
+ * cualquier otra cosa entre los ruidos de un derrumbe.
+ */
+function emitirBaliza(alTerminar, indice = 0) {
+  if (indice >= REPETICIONES) {
+    callarSirena();
+    if (alTerminar) alTerminar();
+    return;
+  }
+  sonarSirena();
+  pasoBaliza = setTimeout(() => {
+    callarSirena();
+    try { hablar(FRASE_BALIZA); } catch (e) {}
+    pasoBaliza = setTimeout(() => emitirBaliza(alTerminar, indice + 1), DURACION_VOZ_MS);
+  }, DURACION_SIRENA_MS);
+}
+
 function iniciarSonido() {
   try {
     setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true });
@@ -319,22 +386,19 @@ function iniciarSonido() {
   detenerSonido();
 
   const desde = Date.now();
-  const emitir = () => {
-    try {
-      if (reproductorSos) {
-        try { reproductorSos.remove(); } catch (e) {}
-      }
-      reproductorSos = createAudioPlayer(SOUND_URLS.sirena_fuerte);
-      reproductorSos.volume = 1.0;
-      reproductorSos.play();
-    } catch (e) {
-      console.log('No se pudo emitir la baliza sonora:', e);
-    }
-    // Se reprograma en cada emision en vez de usar un intervalo fijo: es lo que
-    // permite que la cadencia se vaya espaciando sola.
-    intervaloSonido = setTimeout(emitir, cadenciaSonido(desde));
+  const cicloCompleto = () => {
+    // La siguiente emision se programa cuando TERMINA la actual, no cuando
+    // empieza. Cada emision dura media docena de segundos por repeticion, asi
+    // que medir desde el arranque haria que se solaparan en el tramo mas rapido:
+    // la sirena de la siguiente pisaria la voz de la anterior y no se entenderia
+    // ninguna de las dos.
+    emitirBaliza(() => {
+      // Se recalcula aqui, no al empezar: asi la cadencia se va espaciando sola
+      // conforme pasa el tiempo y baja la bateria.
+      intervaloSonido = setTimeout(cicloCompleto, cadenciaSonido(desde));
+    });
   };
-  emitir();
+  cicloCompleto();
 }
 
 export function detenerSonido() {
@@ -343,6 +407,12 @@ export function detenerSonido() {
     // para poder ir espaciando la cadencia.
     clearTimeout(intervaloSonido);
     intervaloSonido = null;
+  }
+  // Y el paso interno: sin esto, una emision a medias seguiria alternando
+  // sirena y voz despues de que el usuario pulsara "Estoy bien".
+  if (pasoBaliza) {
+    clearTimeout(pasoBaliza);
+    pasoBaliza = null;
   }
   if (reproductorSos) {
     try { reproductorSos.pause(); } catch (e) {}

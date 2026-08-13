@@ -15,6 +15,8 @@ import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.net.Uri
 import android.os.BatteryManager
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 import android.provider.Settings
 import android.os.Build
 import androidx.core.content.ContextCompat
@@ -52,6 +54,42 @@ class EmergenciaModule : Module() {
 
   /** Volumen del sistema antes de subirlo para la baliza, para devolverlo. */
   private var volumenPrevio: Int? = null
+
+  private var tts: TextToSpeech? = null
+  private var ttsListo = false
+
+  /**
+   * Sintetizador de voz, creado una sola vez y reutilizado.
+   *
+   * Arrancarlo cuesta cerca de un segundo, asi que crearlo en cada emision de la
+   * baliza haria que la voz llegara tarde o se perdiera. Se deja vivo mientras
+   * viva el modulo.
+   *
+   * Prefiere español latinoamericano; si el equipo no lo tiene, cae al español
+   * que haya. Una voz en un idioma que el oyente no entiende no sirve de nada.
+   */
+  private fun obtenerTts(): TextToSpeech? {
+    if (tts == null) {
+      tts = TextToSpeech(contexto) { estado ->
+        ttsListo = estado == TextToSpeech.SUCCESS
+        if (ttsListo) {
+          val preferidas = listOf(
+            Locale("es", "MX"), Locale("es", "US"), Locale("es", "CO"), Locale("es")
+          )
+          for (l in preferidas) {
+            val r = tts?.setLanguage(l)
+            if (r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED) break
+          }
+          // Un poco mas lento y grave de lo normal: bajo escombros y a traves de
+          // una losa, lo que llega son las frecuencias bajas y las silabas
+          // separadas.
+          tts?.setSpeechRate(0.85f)
+          tts?.setPitch(0.9f)
+        }
+      }
+    }
+    return tts
+  }
 
   private val contexto: Context
     get() = requireNotNull(appContext.reactContext)
@@ -204,6 +242,42 @@ class EmergenciaModule : Module() {
       } catch (e: Exception) {
         mapOf("ok" to false, "motivo" to (e.message ?: "error_desconocido"))
       }
+    }
+
+    /**
+     * Dice una frase en voz alta.
+     *
+     * Se usa el sintetizador del propio Android en vez de un archivo de audio
+     * grabado por tres razones: no engorda la app, no depende de internet, y
+     * sobre todo permite cambiar la frase sin volver a grabar nada. Quien oye la
+     * baliza bajo escombros necesita una INSTRUCCION, y cual sea la instruccion
+     * util puede cambiar.
+     *
+     * Voz en español latinoamericano. Si el equipo no lo tiene instalado, se cae
+     * al español que haya; una sirena sin voz sigue sirviendo, una voz en un
+     * idioma que el oyente no entiende no.
+     */
+    Function("hablar") { texto: String ->
+      return@Function try {
+        val tts = obtenerTts()
+          ?: return@Function mapOf("ok" to false, "motivo" to "sin_sintetizador")
+
+        // El flujo de alarma ignora el modo silencio, que es justo lo que hace
+        // falta si el telefono quedo en silencio antes del sismo.
+        val params = android.os.Bundle().apply {
+          putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
+          putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+        }
+        tts.speak(texto, TextToSpeech.QUEUE_ADD, params, "baliza")
+        mapOf("ok" to true)
+      } catch (e: Exception) {
+        mapOf("ok" to false, "motivo" to (e.message ?: "error_desconocido"))
+      }
+    }
+
+    /** ¿Puede este telefono hablar? Para avisar antes de la emergencia. */
+    Function("puedeHablar") {
+      mapOf("ok" to (obtenerTts() != null), "listo" to ttsListo)
     }
 
     /** ¿Esta instalado el fork de bitchat con el puente de emergencia? */

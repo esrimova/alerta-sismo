@@ -375,19 +375,33 @@ Por eso la carga impone un piso, y **los umbrales son altos a propósito**: la b
 | Carga | Mínimo entre emisiones |
 |---|---|
 | Más del 80% | Sin restricción: manda el reloj |
-| 60-80% | 2 minutos |
-| 40-60% | 10 minutos |
-| Menos del 40% | 30 minutos |
+| 60-80% | 5 minutos |
+| 40-60% | 30 minutos |
+| Menos del 40% | 1 hora |
 | Enchufado | Sin restricción: si entra corriente, la carga deja de ser el recurso escaso |
+
+Los intervalos son largos porque **quien busca entre escombros no avanza rápido**. Sonar cada pocos segundos no lo acerca antes; solo gasta la carga que decide cuánto tiempo se le puede seguir guiando.
 
 Se recalcula en cada emisión, así que la baliza se va frenando sola conforme baja la carga, sin vigilarla por separado.
 
-| Carga al activarse | Emisiones en 72 h |
-|---|---|
-| 100% | 292 |
-| 70% | 202 |
-| 50% | 160 |
-| 30% | 144 |
+#### Qué suena en cada emisión
+
+**Sirena y voz alternadas, tres veces: 30 segundos en total.** Cada tramo dura cinco segundos, porque un pitido corto se confunde con cualquier otro ruido de un derrumbe.
+
+Van las dos cosas porque cada una hace lo que la otra no puede. La sirena atraviesa mejor los escombros y se oye de lejos, pero no dice nada: quien la oye sabe que hay alguien y no sabe qué hacer. La voz sí da una instrucción, pero se pierde antes con la distancia y el ruido. Alternadas, la sirena trae a la persona y la voz le dice qué hacer cuando ya está cerca.
+
+La voz dice **"Auxilio. Activa el Bluetooth de tu teléfono para encontrarme"**. Es una instrucción y no una queja: saber que hay alguien atrapado no le dice a nadie qué hacer, y encender el Bluetooth sí, porque lleva a la baliza BLE — que dice dónde está y por qué canal se sabe el resto. Es lo que enlaza las tres capas de alcance.
+
+Se usa el sintetizador del propio Android en vez de un audio grabado: no engorda la app, no depende de internet y permite cambiar la frase sin volver a grabar nada. Va más lento y más grave de lo normal, porque a través de una losa lo que llega son las frecuencias bajas y las sílabas separadas.
+
+La siguiente emisión se programa cuando **termina** la anterior, no cuando empieza: midiendo desde el arranque se solaparían en el tramo rápido y la sirena de una pisaría la voz de la otra.
+
+| Carga al activarse | Emisiones en 72 h | Tiempo sonando |
+|---|---|---|
+| 90% | 292 | 146 min |
+| 70% | 184 | 92 min |
+| 50% | 144 | 72 min |
+| 30% | 72 | 36 min |
 
 **El sensor tiene dos modos y la diferencia decide la batería.** En ventana corta sostiene el procesador despierto y recibe las muestras al instante, que es lo que exige medir un sismo. En la vigilancia de réplicas no lo sostiene: le pide al coprocesador de sensores que **acumule y entregue en tandas**, como hacen los pulsómetros para medir todo el día. Un wake lock de seis horas arrasaría la carga justo cuando más falta hace. El precio es que ahí el aviso llega con retraso, y se acepta: en ese modo se están *registrando* réplicas, no avisando de ellas.
 
