@@ -162,11 +162,21 @@ export function recortarBaliza(texto) {
   return corte;
 }
 
-/** Hora de reloj, en el formato que se usa hablando: "4:15 p. m.". */
-function horaDe(ts) {
+/**
+ * Fecha y hora en el formato que se usa hablando: "el 13 de agosto a las 4:15 p. m.".
+ *
+ * Lleva la fecha aunque sea de hoy. Este mensaje puede leerse horas despues de
+ * haberse enviado —la malla lo retiene y lo entrega cuando el destinatario
+ * reaparece— asi que "a las 4:15" sin mas obligaria a quien lo lee a adivinar
+ * de que dia habla. En una emergencia esa duda cuesta.
+ */
+function fechaYHoraDe(ts) {
   if (!ts) return null;
   try {
-    return new Date(ts).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+    const d = new Date(ts);
+    const fecha = d.toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
+    const hora = d.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+    return `el ${fecha} a las ${hora}`;
   } catch (e) {
     return null;
   }
@@ -208,15 +218,15 @@ export function componerFicha(cfg, estado, ubicacion = null, red = null) {
   // no significa nada para alguien que acaba de instalar una app para ayudar:
   // obliga a descifrar cómo funciona la app antes de entender que hay una
   // persona en problemas.
-  // La hora exacta desde la que el usuario no responde. Se dice en reloj y no
-  // solo en "hace tanto" porque quien lee puede cruzarla con lo que sabe: a qué
-  // hora fue el sismo, a qué hora se cayó la luz, cuándo habló con él por
-  // última vez. Un "hace 2 horas" no se cruza con nada.
-  const desdeHora = horaDe(estado?.activadaEn);
+  // Desde cuándo no responde, en fecha y hora. Se dice así y no solo en "hace
+  // tanto" porque quien lee puede cruzarlo con lo que ya sabe: cuándo fue el
+  // sismo, cuándo se cayó la luz, cuándo habló con él por última vez. Un "hace
+  // 2 horas" no se cruza con nada, y además envejece si el mensaje se retiene.
+  const sinResponderDesde = fechaYHoraDe(estado?.activadaEn);
   const quien = nombre ? `Soy ${nombre} y necesito ayuda.` : 'Necesito ayuda.';
   bloques.push(
     `${quien} Es posible que esté inconsciente o atrapado` +
-    (desdeHora ? ` desde las ${desdeHora}` : '') +
+    (sinResponderDesde ? ` desde ${sinResponderDesde}` : '') +
     ': este mensaje lo envió mi teléfono por su cuenta, al ver que yo no respondía.'
   );
 
