@@ -66,8 +66,9 @@ El mismo sismo llega hasta tres veces y en momentos distintos. La app los recono
 
 Tras un sismo fuerte y cercano arranca una cuenta atrás. Si no confirmas que estás bien antes de que venza, se asume que puedes estar incapacitado y se activan dos mecanismos de localización:
 
-- **Baliza Bluetooth** — tu teléfono aparece en la lista de Bluetooth de cualquier celular cercano con un nombre tipo `SOS Esteban 3001234567`, sin necesidad de emparejar ni de instalar nada. Alcanza a quien está cerca y **no necesita red**.
-- **Baliza sonora** — emite una señal cada 30 segundos. A las personas bajo escombros se las encuentra por sonido: es el mecanismo más probado de los dos.
+- **Baliza Bluetooth** — tu teléfono aparece en la lista de Bluetooth de cualquier celular cercano con un nombre tipo `SOS Esteban ap715 bitchat`, sin necesidad de emparejar ni de instalar nada. Alcanza a quien está cerca y **no necesita red**. Ya no lleva teléfono: si la red funciona habrías podido pedir ayuda tú mismo, y si no funciona un número no sirve.
+- **Baliza sonora** — sirena y voz alternadas, que dicen en voz alta qué hacer para encontrarte. A las personas bajo escombros se las encuentra por sonido: es el mecanismo más probado. La frecuencia **se va espaciando** según el tiempo transcurrido y la batería que quede, porque una baliza que suena mucho y muere en ocho horas pierde contra una que aguanta tres días.
+- **Malla Bluetooth** — con el fork de bitchat instalado, quien te encuentre recibe automáticamente una ficha con tus datos médicos, dónde estás y desde cuándo. Solo durante la emergencia.
 
 **Bitácora**
 
@@ -119,7 +120,7 @@ cd android && ./gradlew assembleRelease
 
 Queda en `android/app/build/outputs/apk/release/app-release.apk`.
 
-> El proyecto viene firmado con el keystore de depuración por defecto de Expo. **Si vas a distribuirlo, genera tu propio keystore.**
+> **Necesitas tu propia clave de firma.** El proyecto espera un `keystore.properties` en la raíz —que no está versionado— apuntando a tu keystore. Sin él compila igual, pero firmado con la clave de depuración del toolchain, cuya clave privada es pública; y con esa clave el puente con la malla de emergencia deja de estar protegido, porque depende de un permiso de nivel de firma.
 
 ### Después de instalar
 
@@ -192,4 +193,14 @@ Este software se ofrece sin garantía de ningún tipo. **No dependas de él como
 
 ## Licencia
 
-MIT.
+MIT — ver [`LICENSE`](LICENSE).
+
+### Sobre bitchat
+
+La malla de emergencia usa un **fork modificado de [bitchat for Android](https://github.com/permissionlesstech/bitchat-android)**, que se distribuye bajo **GNU GPL v3**. Ese fork es una **aplicación aparte**, con su propio repositorio y su propia licencia; Alerta Sismo se comunica con él por IPC y no incorpora nada de su código.
+
+Esa separación no es casual: incorporar código GPL v3 dentro de esta app obligaría a publicarla entera bajo GPL v3. Dos aplicaciones que se hablan por intents no propagan la licencia.
+
+Si distribuyes el fork, tiene que ir bajo GPL v3 y con aviso visible de que está modificado.
+
+> **Pendiente:** el repositorio original de bitchat se contradice a sí mismo — su README dice *"released into the public domain"* mientras su `LICENSE.md` son 674 líneas de GNU GPL v3. Ante la duda manda el archivo de licencia, y por eso aquí se trata como GPL v3. Conviene pedirles que lo aclaren antes de publicar un derivado.

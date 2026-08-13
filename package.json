@@ -1,5 +1,5 @@
 {
-  "name": "temp_app",
+  "name": "alerta-sismo",
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
@@ -29,5 +29,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web"
   },
-  "private": true
+  "private": true,
+  "license": "MIT",
+  "author": "Esteban Morales Vanegas",
+  "description": "App Android de apoyo ante emergencias sismicas."
 }
