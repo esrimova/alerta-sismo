@@ -266,6 +266,17 @@ const TRAMOS_SONIDO = [
  */
 const FRASE_BALIZA = 'Auxilio. Activa el Bluetooth de tu teléfono para encontrarme.';
 
+/**
+ * Que sirena acompaña a la voz.
+ *
+ * La de ambulancia y no 'sirena_fuerte': aquella es un tono corto en bucle que
+ * suena a alarma de electrodomestico, y lo que hace falta aqui es algo que
+ * cualquiera reconozca como emergencia sin pensarlo. Ademas su barrido de
+ * frecuencias se distingue mejor del ruido de fondo de un derrumbe que un tono
+ * plano.
+ */
+const SIRENA_BALIZA = 'sirena_ambulancia';
+
 /** Cuantas veces se repite el par sirena + voz en cada emision. */
 const REPETICIONES = 3;
 
@@ -333,7 +344,7 @@ function sonarSirena() {
     if (reproductorSos) {
       try { reproductorSos.remove(); } catch (e) {}
     }
-    reproductorSos = createAudioPlayer(SOUND_URLS.sirena_fuerte);
+    reproductorSos = createAudioPlayer(SOUND_URLS[SIRENA_BALIZA]);
     reproductorSos.volume = 1.0;
     reproductorSos.loop = true; // se corta por tiempo, no por duracion del clip
     reproductorSos.play();
