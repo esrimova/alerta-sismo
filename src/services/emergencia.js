@@ -27,6 +27,8 @@ import {
 } from '../../modules/emergencia';
 import { cargarUbicacionGuardada } from './location';
 import { verificarInternet } from './red';
+import { despertarAhora } from './despertador';
+import { episodioAbierto } from './episodio';
 import { SOUND_URLS } from './alert';
 import { registrarEvento, TIPO } from './bitacora';
 import { FICHA_DEFECTO, balizaPorDefecto, recortarBaliza, componerFicha, fichaTieneContenido } from './ficha';
@@ -199,15 +201,30 @@ export async function confirmarEstoyBien() {
   let malla = null;
   try { malla = desactivarMalla(); } catch (e) { malla = { ok: false, motivo: 'excepcion' }; }
 
+  // El usuario vuelve a poder actuar, asi que el monitoreo tiene que volver a
+  // su ritmo normal AHORA y no cuando venza la espera larga: con el protocolo
+  // disparado el bucle consulta cada 15 minutos, y quedarse asi mientras la
+  // secuencia sismica sigue viva seria dejarlo ciego justo al recuperarse.
+  const bucleDespertado = despertarAhora();
+
+  // Que el usuario este bien no significa que el sismo haya terminado. Si
+  // todavia hay un episodio abierto se deja constancia, porque el estado al que
+  // vuelve la app no es el mismo en un caso que en otro.
+  let episodio = null;
+  try { episodio = await episodioAbierto(); } catch (e) { episodio = null; }
+
   registrarEvento({
     tipo: TIPO.PROTOCOLO,
     subtipo: 'estoy_bien',
     malla,
+    bucleDespertado,
+    sismoEnCurso: !!episodio,
+    episodioId: episodio?.id || null,
     // Cuanto tardo en confirmar. Si el protocolo ya se habia activado, indica
     // que la confirmacion llego tarde.
     trasActivacion: !!previo.activada,
     detalle: previo.activada
-      ? 'El usuario confirmó estar bien DESPUÉS de que el protocolo se activara. Balizas apagadas.'
+      ? `El usuario confirmó estar bien DESPUÉS de que el protocolo se activara. Balizas apagadas y monitoreo de vuelta a ritmo normal${episodio ? ', con el sismo todavía en curso.' : '.'}`
       : 'El usuario confirmó estar bien. Se canceló la cuenta atrás.',
   });
 

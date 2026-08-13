@@ -25,6 +25,7 @@ import { hayInternet, suscribirRed, enModoAvion } from './red';
 import { marcarSinConexion } from './health';
 import { registrarEvento, TIPO } from './bitacora';
 import { iniciarFusion, mantenimientoFusion } from './fusion';
+import { registrarEspera, olvidarEspera, despertarAhora } from './despertador';
 
 const CANAL_MONITOREO = 'monitoreo-activo';
 const INTERVALO_MS = 60000;
@@ -82,6 +83,7 @@ function esperar(ms) {
   return new Promise((resolve) => {
     const t = setTimeout(() => {
       despertar = null;
+      olvidarEspera();
       resolve();
     }, ms);
     despertar = () => {
@@ -89,6 +91,11 @@ function esperar(ms) {
       despertar = null;
       resolve();
     };
+    // Se publica para que otros servicios puedan cortarla. El caso que lo
+    // justifica es "Estoy bien" tras vencer el plazo: en ese instante el
+    // usuario vuelve a poder actuar y el bucle no puede seguir en ritmo
+    // reducido un cuarto de hora mas.
+    registrarEspera(despertar);
   });
 }
 
