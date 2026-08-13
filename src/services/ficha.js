@@ -186,7 +186,7 @@ function haceCuanto(ms) {
  * información falsa, y manda a quien te busca al lugar equivocado. Cuando no se
  * puede saber, se dice que no se pudo saber en vez de elegir por el usuario.
  */
-export function componerFicha(cfg, estado, ubicacion = null) {
+export function componerFicha(cfg, estado, ubicacion = null, red = null) {
   const f = { ...FICHA_DEFECTO, ...(cfg?.ficha || {}) };
   const nombre = (cfg?.miNombre || '').trim();
   const bloques = [];
@@ -253,6 +253,26 @@ export function componerFicha(cfg, estado, ubicacion = null) {
       'Cuando se agote, esta señal desaparece.'
     );
   }
+
+  // La conexion dice algo que ningun otro dato dice. Con internet y sin
+  // respuesta, el silencio no es de la red sino de la persona: nadie con
+  // cobertura deja de pedir ayuda porque si. Sin internet, la zona esta
+  // incomunicada y llamar a la familia tampoco va a servir.
+  if (red?.sabido) {
+    if (red.conectado) {
+      const via = red.tipo ? ` por ${red.tipo}` : '';
+      situacion.push(
+        `Mi teléfono SÍ tiene internet${via}. Que no responda no es falta de señal.`
+      );
+    } else {
+      situacion.push(
+        red.avion
+          ? 'Mi teléfono está en modo avión, así que no tengo internet.'
+          : 'Mi teléfono NO tiene internet. Puede que la zona esté incomunicada.'
+      );
+    }
+  }
+
   if (situacion.length) bloques.push(`SITUACIÓN\n${situacion.join('\n')}`);
 
   const contactos = (cfg?.contactos || [])

@@ -40,6 +40,43 @@ export function suscribirRed(cb) {
   }
 }
 
+/**
+ * Estado detallado de la conexion, para la ficha de emergencia.
+ *
+ * Que el telefono tenga internet o no le dice a quien encuentra al afectado dos
+ * cosas que no puede deducir de otra forma:
+ *
+ *  - CON internet y sin respuesta: el silencio no es un problema de red, es un
+ *    problema de la persona. Nadie con cobertura deja de pedir ayuda porque si.
+ *    Sube la urgencia.
+ *  - SIN internet: la zona esta incomunicada. Avisar a la familia por telefono
+ *    probablemente tampoco va a funcionar, y la malla es el unico canal que
+ *    queda.
+ *
+ * Nunca lanza: es un dato de apoyo y no puede impedir que salga el mensaje.
+ */
+export async function estadoConexion() {
+  try {
+    const estado = await Network.getNetworkStateAsync();
+    const conectado = !!estado.isConnected && estado.isInternetReachable !== false;
+    const tipo = {
+      WIFI: 'wifi',
+      CELLULAR: 'datos móviles',
+      ETHERNET: 'cable',
+      NONE: null,
+    }[estado.type] || null;
+    let avion = false;
+    if (!conectado) {
+      try { avion = await Network.isAirplaneModeEnabledAsync(); } catch (e) { avion = false; }
+    }
+    return { conectado, tipo, avion, sabido: true };
+  } catch (e) {
+    // Sin dato es distinto de "sin conexion", y confundirlos haria decir a la
+    // ficha que la zona esta incomunicada cuando quiza no lo esta.
+    return { conectado: null, tipo: null, avion: false, sabido: false };
+  }
+}
+
 /** Solo Android. Util para explicarle al usuario por que no hay conexion. */
 export async function enModoAvion() {
   try {

@@ -29,6 +29,7 @@ import {
   alMedir, cargarUltimaMedicion, mmiRomano, describirMmi, VENTANAS_SEG,
 } from '../services/sismografo';
 import { estadoEscucha, abrirAjustesEscucha } from '../services/escucha';
+import { estadoConexion } from '../services/red';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Colores del destello segun lo configurado por el usuario.
@@ -187,7 +188,7 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
    * de su historia clínica. Sin verlo, estaría confiando a ciegas en una app que
    * va a repartir sus datos médicos a desconocidos.
    */
-  const verFicha = () => {
+  const verFicha = async () => {
     if (!fichaTieneContenido(emerg)) {
       Alert.alert(
         'La ficha está vacía',
@@ -197,7 +198,8 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
     }
     // Se simula "activado justo ahora" para que se vea la sección de situación.
     const simulado = { activadaEn: Date.now() };
-    Alert.alert('Así lo recibirá', componerFicha(emerg, simulado, ubicacion));
+    const red = await estadoConexion();
+    Alert.alert('Así lo recibirá', componerFicha(emerg, simulado, ubicacion, red));
   };
 
   const alternarProtocolo = async (valor) => {

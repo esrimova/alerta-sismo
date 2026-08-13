@@ -26,6 +26,7 @@ import {
   estadoMalla, activarMalla, desactivarMalla,
 } from '../../modules/emergencia';
 import { cargarUbicacionGuardada } from './location';
+import { estadoConexion } from './red';
 import { SOUND_URLS } from './alert';
 import { registrarEvento, TIPO } from './bitacora';
 import { FICHA_DEFECTO, balizaPorDefecto, recortarBaliza, componerFicha, fichaTieneContenido } from './ficha';
@@ -279,7 +280,8 @@ async function encenderMalla(cfg, estado) {
     if (!fichaTieneContenido(cfg)) return { ok: false, motivo: 'ficha_vacia' };
 
     const ubicacion = await cargarUbicacionGuardada();
-    const texto = componerFicha(cfg, estado, ubicacion);
+    const red = await estadoConexion();
+    const texto = componerFicha(cfg, estado, ubicacion, red);
     const episodio = String(estado?.activadaEn || Date.now());
     const r = activarMalla(texto, textoDeBaliza(cfg), episodio);
     return { ...r, enviadoEn: Date.now() };
