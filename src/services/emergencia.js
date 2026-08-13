@@ -263,13 +263,20 @@ const TRAMOS_SONIDO = [
  * posibilidad de pedir ayuda. Con poca carga, cada emision cuesta minutos de
  * seguir existiendo.
  *
+ * LOS UMBRALES SON ALTOS A PROPOSITO. La baliza sonora no es la unica que gasta:
+ * durante la emergencia tambien corren el anuncio Bluetooth continuo, el
+ * escaneo de la malla y el servicio en primer plano, y el usuario esta
+ * inconsciente y no va a enchufar nada. La carga baja sola aunque la baliza
+ * callara, asi que empezar a racionar al 50% llegaba tarde. Se raciona desde el
+ * 80%, cuando todavia queda margen para estirar.
+ *
  * Manda SIEMPRE el mas lento de los dos criterios. Con bateria de sobra no
  * estorba; con bateria escasa se impone al reloj.
  */
 const TRAMOS_BATERIA = [
-  { desdePct: 50, minimoSeg: 0 },     // holgado: manda el tiempo
-  { desdePct: 20, minimoSeg: 120 },
-  { desdePct: 10, minimoSeg: 600 },
+  { desdePct: 80, minimoSeg: 0 },     // holgado: manda el tiempo
+  { desdePct: 60, minimoSeg: 120 },
+  { desdePct: 40, minimoSeg: 600 },
   { desdePct: 0, minimoSeg: 1800 },
 ];
 

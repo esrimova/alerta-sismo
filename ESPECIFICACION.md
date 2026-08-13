@@ -368,15 +368,26 @@ Nada queda encendido "por si acaso". El reparto es este:
 
 **La cadencia depende del tiempo Y de la carga, y manda el más lento de los dos.** Por tiempo: cada 30 s la primera hora, cada 5 min hasta la cuarta, cada 30 min a partir de ahí. En la primera hora quien busca son vecinos que están al lado *ahora*; después el rescate se mide en días y lo que decide si te encuentran deja de ser la frecuencia sino cuánto dura la batería.
 
-Pero el criterio del reloj **da por hecho que se empieza con batería**, y no siempre es así. Si la emergencia arranca al 15%, sonar cada 30 s durante la primera hora apaga el teléfono antes de que llegue nadie, y con él se van la baliza, la malla y cualquier posibilidad de pedir ayuda. Por eso la carga impone un piso: sin restricción por encima del 50%, mínimo 2 min entre 20 y 50, 10 min entre 10 y 20, y media hora por debajo del 10%. Enchufado no se raciona nada.
+Pero el criterio del reloj **da por hecho que se empieza con batería**, y no siempre es así. Si la emergencia arranca con poca carga, sonar cada 30 s durante la primera hora apaga el teléfono antes de que llegue nadie, y con él se van la baliza, la malla y cualquier posibilidad de pedir ayuda.
 
-Se recalcula en cada emisión, así que la baliza se va frenando sola conforme baja la carga.
+Por eso la carga impone un piso, y **los umbrales son altos a propósito**: la baliza sonora no es la única que gasta. Durante la emergencia también corren el anuncio Bluetooth continuo, el escaneo de la malla y el servicio en primer plano, y el usuario está inconsciente y no va a enchufar nada. La carga baja sola aunque la baliza callara, así que empezar a racionar a la mitad llega tarde.
+
+| Carga | Mínimo entre emisiones |
+|---|---|
+| Más del 80% | Sin restricción: manda el reloj |
+| 60-80% | 2 minutos |
+| 40-60% | 10 minutos |
+| Menos del 40% | 30 minutos |
+| Enchufado | Sin restricción: si entra corriente, la carga deja de ser el recurso escaso |
+
+Se recalcula en cada emisión, así que la baliza se va frenando sola conforme baja la carga, sin vigilarla por separado.
 
 | Carga al activarse | Emisiones en 72 h |
 |---|---|
 | 100% | 292 |
-| 40% | 202 |
-| 15% | 160 |
+| 70% | 202 |
+| 50% | 160 |
+| 30% | 144 |
 
 **El sensor tiene dos modos y la diferencia decide la batería.** En ventana corta sostiene el procesador despierto y recibe las muestras al instante, que es lo que exige medir un sismo. En la vigilancia de réplicas no lo sostiene: le pide al coprocesador de sensores que **acumule y entregue en tandas**, como hacen los pulsómetros para medir todo el día. Un wake lock de seis horas arrasaría la carga justo cuando más falta hace. El precio es que ahí el aviso llega con retraso, y se acepta: en ese modo se están *registrando* réplicas, no avisando de ellas.
 
