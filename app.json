@@ -65,7 +65,9 @@
       ],
       "react-native-notify-kit",
       "./plugins/withForegroundServiceType",
-      "./plugins/withPantallaBloqueo"
+      "./plugins/withPantallaBloqueo",
+      "./plugins/withFirmaPropia",
+      "./plugins/withSinCopiaDeSeguridad"
     ]
   }
 }

@@ -54,3 +54,7 @@ bitchat-android/
 # Salida de compilacion de los modulos nativos
 modules/*/android/build/
 modules/*/android/.gradle/
+
+# Clave de firma propia. Nunca al repositorio.
+alerta-sismo.keystore
+keystore.properties

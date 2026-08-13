@@ -50,10 +50,29 @@ class EmergenciaModule : Module() {
 
   private var advertiser: BluetoothLeAdvertiser? = null
   private var callback: AdvertiseCallback? = null
-  private var nombreOriginal: String? = null
+  /**
+   * Nombre Bluetooth y volumen previos, GUARDADOS EN DISCO.
+   *
+   * Vivian solo en memoria, y eso dejaba un rastro peor que el problema que
+   * resolvian: si el sistema mataba la app entre activar la baliza y apagarla
+   * —cosa que HyperOS hace de forma agresiva, ver ESPECIFICACION §5— el telefono
+   * se quedaba llamandose "SOS <nombre> ap<apto>" para siempre, publicando el
+   * nombre y el apartamento del usuario a cualquiera que escaneara Bluetooth. Y
+   * el volumen, al maximo.
+   *
+   * Persistidos, se pueden deshacer en el siguiente arranque aunque nadie llegue
+   * a llamar a detenerBaliza().
+   */
+  private val prefs
+    get() = contexto.getSharedPreferences("alerta_sismo_emergencia_nativo", Context.MODE_PRIVATE)
 
-  /** Volumen del sistema antes de subirlo para la baliza, para devolverlo. */
-  private var volumenPrevio: Int? = null
+  private var nombreOriginal: String?
+    get() = prefs.getString("nombre_bt_previo", null)
+    set(v) { prefs.edit().apply { if (v == null) remove("nombre_bt_previo") else putString("nombre_bt_previo", v) }.apply() }
+
+  private var volumenPrevio: Int?
+    get() = prefs.getInt("volumen_previo", -1).takeIf { it >= 0 }
+    set(v) { prefs.edit().apply { if (v == null) remove("volumen_previo") else putInt("volumen_previo", v) }.apply() }
 
   private var tts: TextToSpeech? = null
   private var ttsListo = false
@@ -108,8 +127,43 @@ class EmergenciaModule : Module() {
         tienePermiso(Manifest.permission.BLUETOOTH_CONNECT)
     } else true
 
+  /**
+   * Deshace lo que quedara a medias de una emergencia anterior.
+   *
+   * Se ejecuta al crear el modulo, que es lo primero que pasa al abrir la app.
+   * Si el telefono sigue llamandose "SOS ..." o con el volumen al maximo, es que
+   * el proceso murio en plena emergencia y nadie llego a devolverlo.
+   */
+  private fun deshacerRastroPendiente() {
+    try {
+      val nombre = nombreOriginal
+      if (nombre != null) {
+        adaptador()?.name = nombre
+        nombreOriginal = null
+        android.util.Log.i("Emergencia", "Se restauro el nombre Bluetooth de una emergencia anterior")
+      }
+    } catch (e: Exception) {
+      // Sin permiso no se puede; se reintentara en el siguiente arranque.
+    }
+    try {
+      val vol = volumenPrevio
+      if (vol != null) {
+        val am = contexto.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        am?.setStreamVolume(AudioManager.STREAM_MUSIC, vol, 0)
+        volumenPrevio = null
+        android.util.Log.i("Emergencia", "Se restauro el volumen de una emergencia anterior")
+      }
+    } catch (e: Exception) {
+      // ignorado
+    }
+  }
+
   override fun definition() = ModuleDefinition {
     Name("Emergencia")
+
+    OnCreate {
+      deshacerRastroPendiente()
+    }
 
     /** Diagnostico para la interfaz: que se puede y que no, antes de la emergencia. */
     Function("estadoBluetooth") {
