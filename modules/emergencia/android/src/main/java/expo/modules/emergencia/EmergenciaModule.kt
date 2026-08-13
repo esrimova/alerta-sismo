@@ -25,7 +25,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
  *
  * BALIZA BLUETOOTH
  * Cuando el temporizador de "Estoy bien" vence, se cambia el nombre del
- * adaptador Bluetooth a algo como "SOS Esteban 3003515616" y se emite un
+ * adaptador Bluetooth a algo como "SOS Ana ap715 bitchat" y se emite un
  * anuncio BLE que lo incluye. Cualquier persona cerca lo ve en la lista normal
  * de Bluetooth de su telefono, SIN necesidad de emparejar ni de tener una app.
  *
@@ -36,9 +36,10 @@ import expo.modules.kotlin.modules.ModuleDefinition
  *    BLUETOOTH_PRIVILEGED, reservado a apps del sistema. Por eso se usa BLE,
  *    que solo necesita BLUETOOTH_ADVERTISE.
  *  - El paquete BLE son 31 bytes, asi que el nombre debe ser corto (~26
- *    caracteres). No caben nombre, telefono y coordenadas a la vez, asi que
- *    se priorizan nombre y telefono del contacto: son los que permiten actuar
- *    a quien encuentre la baliza.
+ *    caracteres). El telefono se retiro: si la red celular funciona, el
+ *    afectado habria podido pedir ayuda el mismo, y si no funciona un numero
+ *    es inutil. Esos caracteres rinden mas diciendo DONDE esta y por que canal
+ *    se sabe el resto. El texto lo compone src/services/ficha.js.
  *  - El nombre del adaptador es PERSISTENTE. Se guarda el original al empezar
  *    y se restaura al detener, para no dejar el telefono llamandose "SOS".
  */

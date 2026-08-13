@@ -442,7 +442,7 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
           style={styles.input}
           value={emerg.textoBaliza}
           onChangeText={(v) => actualizarEmerg('textoBaliza', v)}
-          placeholder={balizaPorDefecto(emerg) || 'SOS Esteban ap715 bitchat'}
+          placeholder={balizaPorDefecto(emerg) || 'SOS Ana ap715 bitchat'}
           placeholderTextColor="#64748B"
         />
 
@@ -679,17 +679,20 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
 
         {emerg.activo && (
           <>
-            <Text style={styles.label}>Nombre y apellido</Text>
+            {/* "Apellidos" en plural y con dos en el ejemplo: en Colombia son
+                dos, y el singular invitaba a escribir solo uno. */}
+            <Text style={styles.label}>Nombre y apellidos completos</Text>
             <TextInput
               style={styles.input}
               value={emerg.miNombre}
               onChangeText={(v) => actualizarEmerg('miNombre', v)}
-              placeholder="Esteban Rivera"
+              placeholder="Ana Gómez Ruiz"
               placeholderTextColor="#64748B"
             />
             <Text style={styles.endpointTexto}>
-              Con apellido: quien te encuentre no te conoce, y un nombre suelto no le
-              sirve para dar razón de ti a nadie.
+              Escríbelo completo, con los dos apellidos. Quien te encuentre no te conoce,
+              y un nombre suelto no le sirve para dar razón de ti a nadie ni para
+              buscarte en una lista de heridos.
             </Text>
 
             <Text style={[styles.label, { marginTop: 20 }]}>Mi WhatsApp</Text>
