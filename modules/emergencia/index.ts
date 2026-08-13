@@ -98,3 +98,19 @@ export function activarMalla(
 export function desactivarMalla(): Resultado {
   return Emergencia.desactivarMalla();
 }
+
+/**
+ * Sube el volumen del sistema al máximo para la baliza sonora.
+ *
+ * Poner el reproductor al 1.0 solo da el 100% *del volumen del sistema*: con el
+ * teléfono al 20% la baliza suena floja, y de madrugada —cuando menos capaz es
+ * el usuario de reaccionar— es lo normal.
+ */
+export function subirVolumenBaliza(): Resultado & { previo?: number; maximo?: number } {
+  return Emergencia.subirVolumenBaliza();
+}
+
+/** Devuelve el volumen que tenía el teléfono antes de la emergencia. */
+export function restaurarVolumen(): Resultado {
+  return Emergencia.restaurarVolumen();
+}

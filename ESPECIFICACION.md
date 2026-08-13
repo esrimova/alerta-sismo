@@ -358,10 +358,15 @@ Nada queda encendido "por si acaso". El reparto es este:
 | Vigilancia de réplicas a 5 Hz | Solo tras una alerta roja, y con el sensor acumulando en tandas |
 | Escucha de la alerta de Google | Siempre, pero la vincula el sistema y solo despierta cuando llega una notificación |
 | Malla de bitchat | Solo durante la emergencia, con plazo máximo de encendido |
-| Balizas Bluetooth y sonora | Solo durante la emergencia |
+| Baliza Bluetooth | Solo durante la emergencia |
+| Baliza sonora | Solo durante la emergencia, y espaciándose con el tiempo |
 | Lectura del GPS | Solo al abrir la app, como mucho cada 12 h |
 
 **Con el protocolo activado se espacia el sondeo del feed.** Si venció sin confirmación se asume que el usuario no puede responder, así que consultar cada minuto gasta radio y batería para producir un aviso que nadie va a leer. Y la batería es literalmente la ventana de rescate: la propia ficha le dice a quien busca que cuando se agote, la señal desaparece. No se apaga del todo porque el registro sísmico de esas horas —las réplicas sobre todo— tiene valor después.
+
+**La baliza sonora suena al máximo del sistema y va espaciándose.** Subir el volumen del sistema no es un detalle: poner el reproductor al 100% solo da el 100% *de lo que tenga puesto el teléfono*, y de madrugada suele estar bajo — justo cuando el usuario menos puede reaccionar. Se guarda el volumen previo y se devuelve al terminar.
+
+La cadencia no es fija porque el problema cambia con el tiempo: cada 30 s la primera hora, cada 5 min hasta la cuarta, y cada 30 min a partir de ahí. En la primera hora quien busca son vecinos que están al lado *ahora*. Pasado ese rato el rescate se mide en días y lo que decide si te encuentran deja de ser la frecuencia y pasa a ser cuánto dura la batería: una baliza que suena cada 30 s y muere en ocho horas pierde contra una que suena cada media hora durante tres días. En 24 horas son 196 emisiones en vez de 2880.
 
 **El sensor tiene dos modos y la diferencia decide la batería.** En ventana corta sostiene el procesador despierto y recibe las muestras al instante, que es lo que exige medir un sismo. En la vigilancia de réplicas no lo sostiene: le pide al coprocesador de sensores que **acumule y entregue en tandas**, como hacen los pulsómetros para medir todo el día. Un wake lock de seis horas arrasaría la carga justo cuando más falta hace. El precio es que ahí el aviso llega con retraso, y se acepta: en ese modo se están *registrando* réplicas, no avisando de ellas.
 

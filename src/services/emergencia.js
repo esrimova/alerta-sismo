@@ -24,6 +24,7 @@ import * as Notifications from 'expo-notifications';
 import {
   iniciarBaliza, detenerBaliza, estadoBluetooth,
   estadoMalla, activarMalla, desactivarMalla,
+  subirVolumenBaliza, restaurarVolumen,
 } from '../../modules/emergencia';
 import { cargarUbicacionGuardada } from './location';
 import { verificarInternet } from './red';
@@ -234,11 +235,41 @@ export async function confirmarEstoyBien() {
 let reproductorSos = null;
 let intervaloSonido = null;
 
+/**
+ * Cada cuanto suena la baliza, segun lo que lleve activa.
+ *
+ * No es un intervalo fijo porque el problema cambia con el tiempo. En la primera
+ * hora quien busca son vecinos que estan al lado AHORA, y ahi conviene sonar
+ * seguido. Pasado ese rato el rescate se mide en dias, y lo que decide si te
+ * encuentran deja de ser la frecuencia y pasa a ser cuanto dura la bateria: una
+ * baliza que suena cada 30 s y muere en 8 horas pierde contra una que suena cada
+ * media hora durante tres dias.
+ *
+ * El ultimo tramo es la cadencia de regimen. Los anteriores solo existen para
+ * cubrir la ventana en la que todavia hay alguien cerca.
+ */
+const TRAMOS_SONIDO = [
+  { hastaMin: 60, cadaSeg: 30 },
+  { hastaMin: 240, cadaSeg: 300 },
+  { hastaMin: Infinity, cadaSeg: 1800 },
+];
+
+function cadenciaSonido(desdeMs) {
+  const min = (Date.now() - desdeMs) / 60000;
+  const tramo = TRAMOS_SONIDO.find((t) => min < t.hastaMin) || TRAMOS_SONIDO[TRAMOS_SONIDO.length - 1];
+  return tramo.cadaSeg * 1000;
+}
+
 function iniciarSonido() {
   try {
     setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true });
   } catch (e) {}
+  // El volumen del reproductor es relativo al del sistema, asi que sin esto la
+  // baliza suena a lo que estuviera puesto el telefono.
+  try { subirVolumenBaliza(); } catch (e) {}
   detenerSonido();
+
+  const desde = Date.now();
   const emitir = () => {
     try {
       if (reproductorSos) {
@@ -250,15 +281,18 @@ function iniciarSonido() {
     } catch (e) {
       console.log('No se pudo emitir la baliza sonora:', e);
     }
+    // Se reprograma en cada emision en vez de usar un intervalo fijo: es lo que
+    // permite que la cadencia se vaya espaciando sola.
+    intervaloSonido = setTimeout(emitir, cadenciaSonido(desde));
   };
   emitir();
-  // Cada 30 s: audible para quien busca, sin agotar la bateria en minutos.
-  intervaloSonido = setInterval(emitir, 30000);
 }
 
 export function detenerSonido() {
   if (intervaloSonido) {
-    clearInterval(intervaloSonido);
+    // clearTimeout y no clearInterval: la baliza se reprograma en cada emision
+    // para poder ir espaciando la cadencia.
+    clearTimeout(intervaloSonido);
     intervaloSonido = null;
   }
   if (reproductorSos) {
@@ -266,6 +300,10 @@ export function detenerSonido() {
     try { reproductorSos.remove(); } catch (e) {}
     reproductorSos = null;
   }
+  // Se devuelve el volumen que tenia el telefono. Dejarlo al maximo despues de
+  // la emergencia seria un efecto secundario que el usuario no pidio, y que
+  // descubriria de la peor forma: con el primer video que reproduzca.
+  try { restaurarVolumen(); } catch (e) {}
 }
 
 export async function pedirPermisosBluetooth() {

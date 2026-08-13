@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.net.Uri
 import android.os.BatteryManager
 import android.provider.Settings
@@ -48,6 +49,9 @@ class EmergenciaModule : Module() {
   private var advertiser: BluetoothLeAdvertiser? = null
   private var callback: AdvertiseCallback? = null
   private var nombreOriginal: String? = null
+
+  /** Volumen del sistema antes de subirlo para la baliza, para devolverlo. */
+  private var volumenPrevio: Int? = null
 
   private val contexto: Context
     get() = requireNotNull(appContext.reactContext)
@@ -154,6 +158,52 @@ class EmergenciaModule : Module() {
         // Sin permiso no se puede restaurar; se informa igual.
       }
       mapOf("ok" to true)
+    }
+
+    /**
+     * Sube el volumen del sistema al maximo para la baliza sonora.
+     *
+     * Poner el reproductor al 1.0 solo da el 100% DEL VOLUMEN DEL SISTEMA. Si el
+     * telefono esta al 20% —lo normal de madrugada, que es cuando el usuario
+     * tiene menos posibilidades de reaccionar— la baliza suena floja y se pierde
+     * el unico mecanismo con el que de verdad se encuentra a alguien bajo
+     * escombros.
+     *
+     * Se guarda el volumen previo para devolverlo al terminar: dejar el telefono
+     * al maximo para siempre seria un efecto secundario que el usuario no pidio.
+     */
+    Function("subirVolumenBaliza") {
+      return@Function try {
+        val am = contexto.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+          ?: return@Function mapOf("ok" to false, "motivo" to "sin_audio")
+
+        if (volumenPrevio == null) {
+          volumenPrevio = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+        }
+        val maximo = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        am.setStreamVolume(AudioManager.STREAM_MUSIC, maximo, 0)
+        mapOf("ok" to true, "previo" to volumenPrevio, "maximo" to maximo)
+      } catch (e: SecurityException) {
+        // Ocurre con "No molestar" activo sin permiso de politica de
+        // notificaciones. Se suena igual, al volumen que hubiera.
+        mapOf("ok" to false, "motivo" to "no_molestar")
+      } catch (e: Exception) {
+        mapOf("ok" to false, "motivo" to (e.message ?: "error_desconocido"))
+      }
+    }
+
+    /** Devuelve el volumen que tenia el telefono antes de la emergencia. */
+    Function("restaurarVolumen") {
+      return@Function try {
+        val previo = volumenPrevio ?: return@Function mapOf("ok" to true, "motivo" to "no_se_cambio")
+        val am = contexto.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+          ?: return@Function mapOf("ok" to false, "motivo" to "sin_audio")
+        am.setStreamVolume(AudioManager.STREAM_MUSIC, previo, 0)
+        volumenPrevio = null
+        mapOf("ok" to true)
+      } catch (e: Exception) {
+        mapOf("ok" to false, "motivo" to (e.message ?: "error_desconocido"))
+      }
     }
 
     /** ¿Esta instalado el fork de bitchat con el puente de emergencia? */
