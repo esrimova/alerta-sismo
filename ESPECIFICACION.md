@@ -194,11 +194,12 @@ Donde la app tiene más valor único y menos construido.
 | Función | Estado |
 |---|---|
 | Protocolo de hombre muerto: cuenta atrás y botón "Estoy bien" | **construido** |
-| Baliza Bluetooth visible sin emparejar | **construido**, pendiente cambiar su contenido |
+| Baliza Bluetooth visible sin emparejar, con texto editable | **construido** |
 | Baliza sonora periódica para localización bajo escombros | **construido** |
 | Vigilancia de réplicas con el acelerómetro tras una alerta roja | **construido**, pendiente verificar que HyperOS no la mate |
-| Malla Bluetooth para comunicación real, mediante fork de bitchat | **decidido** |
-| Ficha de triaje automática por la malla | **decidido** |
+| Malla Bluetooth mediante fork de bitchat, encendida y apagada por esta app | **construido**, pendiente probar entre dos aparatos |
+| Ficha de triaje automática por la malla | **construido**, pendiente probar entre dos aparatos |
+| Apodo SOS visible en la lista de pares de la malla | **decidido** |
 | Ventana de vigilancia de réplicas dimensionada con la ley de Omori | **abierto** |
 | Detección de inmovilidad del teléfono como señal para el hombre muerto | **abierto** |
 | Guía de acción según intensidad estimada y perfil de edificación | **abierto** |
@@ -225,13 +226,27 @@ Cada capa llega a alguien distinto y ninguna reemplaza a las otras:
 | **Baliza Bluetooth** | Cualquiera con un celular, a 10-30 m | **Nada**: aparece en la lista normal de Bluetooth, sin app ni emparejamiento |
 | **Malla bitchat** | Varios saltos de distancia, conversación real | Tener la app instalada |
 
-**El teléfono en la baliza no aporta nada y se retira.** Si la red celular funciona, el afectado habría podido pedir ayuda él mismo; si no funciona, un número es inútil. La baliza pasa a ser un **puntero al canal** — algo como `SOS instala bitchat` — no una portadora de datos. Sus 26 caracteres nunca iban a caber una ficha médica.
+**El teléfono en la baliza no aporta nada y se retiró.** Si la red celular funciona, el afectado habría podido pedir ayuda él mismo; si no funciona, un número es inútil. Sus 26 caracteres nunca iban a caber una ficha médica.
+
+Con ese espacio libre la baliza lleva ahora **dónde está y por qué canal se sabe el resto**: `SOS Esteban ap715 bitchat`, 25 de 26 caracteres. El apartamento es lo accionable para quien está parado en el edificio y "bitchat" es el puntero al canal; se abrevian ambos antes que soltar uno. **El texto es editable**, porque el útil depende de dónde esté el usuario: "apartamento 715" no significa nada si le pasa algo en la calle. La interfaz muestra el contador y la vista previa de lo que realmente se va a emitir, o Android recortaría en silencio y el usuario se enteraría en plena emergencia.
+
+**La baliza y el nodo de la malla son dos señales distintas.** La baliza cambia el nombre del adaptador Bluetooth y aparece en la lista normal de cualquier teléfono, sin apps. bitchat no escanea eso: tiene su propio protocolo y su propia lista. Quien instale bitchat no verá la baliza, y por eso el apodo SOS en la malla sigue pendiente.
 
 #### Ficha de triaje
 
-Cuando el modo emergencia está activo, quien escriba por la malla recibe automáticamente: aviso de que el mensaje es automático, edad, tipo de sangre, alergias, medicamentos de los que depende, piso y apartamento, ubicación aproximada, **porcentaje de batería** y **tiempo transcurrido desde la activación**.
+**Se envía al DESCUBRIR a alguien en la malla, no al recibir un mensaje suyo.** Quien encuentra al afectado acaba de instalar la app y no tiene por qué saber que debe escribirle; esperar a que lo haga sería perder el rescate por una convención de interfaz. También se responde a un mensaje entrante, por si el envío del descubrimiento se perdió.
 
-Los dos últimos son los que un equipo de rescate no puede obtener de ninguna otra forma: la batería marca el plazo en que la señal dejará de existir, y el tiempo transcurrido determina la prioridad frente a otros rescates.
+El mensaje está escrito para quien lo lee, no para quien lo programó: abre con nombre completo y la petición directa de ayuda. Explicar el mecanismo —"no confirmé estar bien tras un sismo"— obliga a entender cómo funciona la app antes de entender que hay una persona en problemas.
+
+Contiene: aviso de que es automático, nombre y apellidos, datos médicos, dónde está, **batería**, **tiempo transcurrido**, **si hay salida a internet**, contactos de emergencia y quién más vive en la casa.
+
+Tres de esos datos no se pueden obtener de ninguna otra forma:
+
+- La **batería** marca el plazo en que la señal dejará de existir.
+- El **tiempo transcurrido** determina la prioridad frente a otros rescates.
+- La **conexión a internet** dice por dónde seguir hablando, y algo más: si el teléfono tiene salida y aun así nadie responde, el silencio no es de la red sino de la persona. Con internet se ofrece el WhatsApp del usuario, porque esa vía aguanta lo que una malla Bluetooth de varios saltos no aguanta; sin internet se advierte que el canal depende de la distancia y se pide que dejen instrucciones igualmente.
+
+**La dirección de casa solo se envía si el teléfono cree que el usuario está en ella**, y lo mismo con quién más vive allí. Mandar "apartamento 715" desde la calle no es información incompleta: es información falsa, y envía a quien busca al lugar equivocado. Como la app usa ubicación aproximada, solo puede descartar con certeza que esté cerca; dentro del radio es probable y el mensaje nunca lo afirma como un hecho. Cuando no se puede determinar, la dirección se ofrece marcada como no confirmada: ocultarla perdería el único dato que existe y afirmarla sería mentir.
 
 #### Regla de privacidad, innegociable
 
@@ -239,7 +254,9 @@ Los dos últimos son los que un equipo de rescate no puede obtener de ninguna ot
 
 Un respondedor siempre activo convierte la app en una fuga de historia clínica y ubicación hacia cualquiera en rango de Bluetooth. La app se va a instalar en teléfonos de familiares y su código será público, así que esta regla se verifica explícitamente en ambos sentidos: con la emergencia apagada, nadie recibe nada.
 
-Además se responde **una sola vez por par y por episodio**, para no convertir la malla en un bucle de mensajes durante una emergencia real.
+Al terminar la emergencia se **borra** la ficha del lado del fork, y con ella lo que ese teléfono retuviera para terceros. Dejarlo guardado sería dejar datos de un episodio cerrado a merced de que un fallo posterior encendiera el modo por error.
+
+Se insiste **como mucho tres veces por par y por episodio, separadas cinco minutos**. No es "una sola vez", y la diferencia importa: sin confirmación de entrega, dar por bueno el primer envío deja sin ficha a quien lo pierda —el proceso puede morir antes de enviar, o el mensaje caer en una caché volátil—. El tope existe para no convertir la malla en un bucle cuando el ancho de banda y la batería son lo que más escasea.
 
 #### Arquitectura de la integración
 
@@ -258,17 +275,33 @@ Todo lo añadido es **lógica de aplicación**: no se toca el protocolo, ni la c
 
 Hay que **añadir un servicio exportado** al fork, protegido con permiso de firma para que solo Alerta Sismo pueda invocarlo. Hoy bitchat no expone ninguno: `MeshForegroundService` y todos sus receptores son `exported="false"`, y `TransportBridgeService` no es un servicio de Android sino un objeto Kotlin que puentea BLE con Wi-Fi Aware internamente.
 
+#### Quién manda sobre la malla
+
+**Alerta Sismo la enciende y la apaga; bitchat no corre por su cuenta.** Mantener la malla viva permanentemente gastaría batería sin parar para cubrir un evento que puede no ocurrir en años.
+
+Se enciende al vencer el protocolo de emergencia y se apaga al pulsar "Estoy bien", que además hace que el fork borre la ficha. Ese botón **termina la emergencia en el acto** y la app vuelve a su modo normal de monitoreo; la malla se corta en seco y es lo correcto: si el usuario ya dijo estar bien, no hay nada que seguir difundiendo.
+
+El fork lleva además un **plazo máximo de encendido** (6 horas por defecto). Es un interruptor de seguridad, no una preferencia: si Alerta Sismo muriera sin llegar a dar la orden de apagado, bitchat se quedaría escaneando indefinidamente. Se programa con `AlarmManager` porque un plazo de horas tiene que sobrevivir justo al escenario del que protege.
+
+**El fork no pide ubicación permanente.** Se retiraron la ubicación de segundo plano y la precisa, y se declara `neverForLocation` en el escaneo Bluetooth: desde Android 12 basta con afirmar que no se deduce la posición a partir de los resultados, que aquí es cierto porque solo se descubren dispositivos. Pedir seguimiento continuo para algo que vive minutos al año es pedir mucho más de lo que se devuelve.
+
+**La cola de reenvío se persiste en disco**, apartándose del diseño original. bitchat la guarda solo en memoria, y para un chat es razonable: evita escribir a disco tráfico cifrado de terceros que va de paso. Aquí el cálculo es otro — si el usuario está inconsciente y alguien le escribió algo que puede cambiar el desenlace, perderlo porque el sistema mató el proceso no es aceptable. Se persiste **solo durante la emergencia** y se borra al terminarla.
+
+Alcance de eso, para no prometer de más: protege lo que **este** teléfono retiene. Lo que otra persona guarda para el usuario vive en la cola de su teléfono, y si tiene el bitchat de la tienda seguirá siendo volátil.
+
 #### Secuencia de trabajo, con puertas
 
 El riesgo real no es programar: es invertir semanas y descubrir al final que la malla no atraviesa una losa de concreto.
 
-1. **Verificar la malla** — puerta de entrada a todo lo demás. Aún sin hacer.
+1. **Verificar la malla entre dos aparatos** — sigue sin hacerse, y es lo único que puede confirmar que todo lo demás sirve.
 2. Compilar el fork sin modificar — **hecho**.
-3. Renombrar el paquete — solo necesario para tener ambas apps en el **mismo** teléfono.
-4. Modo emergencia y servicio expuesto.
-5. Auto-respondedor.
-6. Integración desde `activarProtocolo()` y `confirmarEstoyBien()` en `src/services/emergencia.js`.
+3. Modo emergencia y servicio expuesto — **hecho**.
+4. Auto-respondedor — **hecho**.
+5. Integración desde `activarProtocolo()` y `confirmarEstoyBien()` — **hecho**.
+6. Apodo SOS visible en la lista de pares de la malla — pendiente.
 7. Resolver el conflicto de radio (ver §5).
+
+**Renombrar el paquete dejó de hacer falta**: se desinstaló el bitchat de la tienda y el fork ocupa su lugar. Ambas apps se firman ahora con la **misma clave**, que es de lo que depende el permiso de nivel de firma que protege el servicio expuesto.
 
 ---
 
@@ -375,11 +408,13 @@ Puntos a resolver:
 
 **Lo siguiente que hay que hacer, en orden:**
 
-1. **Probar la malla.** Es la puerta que bloquea todo el trabajo de la malla. Requiere **dos aparatos, como instrumental de prueba** — una malla no se puede verificar con un solo nodo. Sirve un segundo teléfono cualquiera o el de un familiar con bitchat instalado; no forma parte del diseño de la app. Instalar **la misma versión compilada** en ambos, probar en la misma habitación, luego con una losa de concreto de por medio, y **con datos y wifi apagados en los dos** — bitchat cae a Nostr por internet cuando la malla no alcanza, así que sin apagar la red se puede creer que funciona el Bluetooth cuando el mensaje viajó por el celular. Medir a qué distancia se pierde.
-2. Probar por separado si la versión compilada habla con la de Play Store, que es el escenario de familiares y rescatistas.
-3. Decidir si renombrar el paquete del fork. Solo hace falta para tener ambas apps en el mismo teléfono; para probar entre equipos distintos, no.
+1. **Probar la malla.** Sigue siendo la puerta, y ahora bloquea código ya escrito en vez de código por escribir. Requiere **dos aparatos, como instrumental de prueba** — una malla no se puede verificar con un solo nodo. Instalar **la misma versión compilada** en ambos, probar en la misma habitación, luego con una losa de concreto de por medio, y **con datos y wifi apagados en los dos** — bitchat cae a Nostr por internet cuando la malla no alcanza, así que sin apagar la red se puede creer que funciona el Bluetooth cuando el mensaje viajó por el celular. Medir a qué distancia se pierde.
+2. **Comprobar que la ficha llega sola**, sin que el segundo aparato escriba nada: es la premisa de todo el diseño y hoy no está verificada.
+3. Probar por separado si la versión compilada habla con la de Play Store, que es el escenario de familiares y rescatistas.
 
-**Advertencia al instalar el fork:** conserva el mismo `applicationId` (`com.bitchat.droid`) pero va firmado con clave de depuración, así que Android rechaza instalarlo encima del de Play Store. Hay que desinstalar primero, y eso borra la identidad y el historial de bitchat en ese teléfono.
+**Al instalar el fork:** conserva el mismo `applicationId` (`com.bitchat.droid`), así que Android rechaza instalarlo encima del de Play Store y hay que desinstalar ese primero, perdiendo su identidad e historial. Ya está hecho en el equipo de referencia.
+
+En Xiaomi la instalación por cable falla con `INSTALL_FAILED_USER_RESTRICTED` **si la pantalla está bloqueada**. No es un problema del paquete: basta con desbloquearla.
 
 **Verificaciones en el equipo de referencia, pendientes:**
 
@@ -403,6 +438,6 @@ Puntos a resolver:
 - Ajustar el intérprete del texto de Google a su redacción real en español. Hasta que llegue una alerta real se trabaja a ciegas, y por eso nada depende de que funcione.
 - Abrir un issue en bitchat pidiendo que aclaren la contradicción de licencia entre README y `LICENSE.md`. Hace falta certeza antes de publicar un derivado.
 - **El `LICENSE` de este repo es el MIT que trae Expo por defecto, con copyright de "650 Industries, Inc. (aka Expo)".** No es el de este proyecto. Hay que reemplazarlo antes de publicar.
-- Texto definitivo de la baliza Bluetooth, ahora que deja de llevar un teléfono.
+- Que el apodo del nodo en la malla pase a `SOS <nombre> ap<apto>` durante la emergencia. Sin eso, quien instale bitchat recibe la ficha automáticamente pero no ve ninguna señal de auxilio en su lista de pares.
 - **"Instala bitchat" exige internet, justo lo que se cae tras un sismo.** Funciona para familia que ya lo tenga; no para un rescatista externo. Sin resolver.
 - Mantener un fork tiene costo: si bitchat cambia el protocolo, el fork se cae de la red sin avisar. Conviene vigilar el repositorio de origen.
