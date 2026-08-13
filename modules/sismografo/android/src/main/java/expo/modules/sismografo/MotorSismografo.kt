@@ -67,6 +67,25 @@ object MotorSismografo {
   private const val G = 9.80665
 
   /**
+   * Frontera entre medir un evento y vigilar durante horas.
+   *
+   * Por debajo se prioriza la fidelidad —procesador despierto, muestras al
+   * instante—; por encima se prioriza la bateria. Cinco minutos deja del lado
+   * corto cualquier ventana disparada por una alerta y del largo la vigilancia
+   * de replicas, que es la unica que dura horas.
+   */
+  private const val VENTANA_CORTA_MAX_MS = 5 * 60 * 1000
+
+  /**
+   * Cuanto puede acumular el coprocesador antes de despertar al procesador.
+   *
+   * Un minuto de tanda significa que el procesador principal duerme casi todo
+   * el rato mientras el sensor sigue midiendo. Si el equipo no soporta acumular,
+   * Android lo ignora y entrega como siempre: se pierde el ahorro, no la medida.
+   */
+  private const val LATENCIA_TANDA_US = 60_000_000
+
+  /**
    * A donde se mandan los eventos cuando hay alguien escuchando. Lo conecta el
    * modulo de Expo mientras vive; si es null, la medida se guarda en la cola.
    */
@@ -266,12 +285,29 @@ object MotorSismografo {
 
     val h = obtenerHandler()
     val periodoUs = 1_000_000 / hz
-    sm.registerListener(escucha, acel, periodoUs, h)
+
+    // DOS MODOS, y la diferencia entre ellos decide la bateria del telefono.
+    //
+    // Ventana CORTA (una alerta): se sostiene el procesador despierto y se
+    // reciben las muestras al instante. Dura segundos y hay que medir bien.
+    //
+    // Ventana LARGA (vigilancia de replicas, horas): NI se sostiene el
+    // procesador NI se reciben al instante. Se pide al coprocesador de sensores
+    // que ACUMULE y entregue en tandas, que es como los pulsometros miden todo
+    // el dia sin fundir la bateria. Un wake lock de seis horas arrasaria la
+    // carga justo cuando es la ventana de rescate.
+    //
+    // El precio del modo largo es que el aviso de sacudida llega con retraso.
+    // Se acepta: ahi se esta REGISTRANDO replicas, no avisando de ellas.
+    val esLarga = ventanaMs > VENTANA_CORTA_MAX_MS
+    val latenciaUs = if (esLarga) LATENCIA_TANDA_US else 0
+
+    sm.registerListener(escucha, acel, periodoUs, latenciaUs, h)
     sm.getDefaultSensor(Sensor.TYPE_GYROSCOPE)?.let {
-      sm.registerListener(escucha, it, periodoUs, h)
+      sm.registerListener(escucha, it, periodoUs, latenciaUs, h)
     }
 
-    tomarWakeLock(ventanaMs.toLong())
+    if (!esLarga) tomarWakeLock(ventanaMs.toLong())
 
     // El cierre se programa aqui: si el proceso sigue vivo, la ventana termina
     // sola aunque JS se haya quedado ocupado o muerto.

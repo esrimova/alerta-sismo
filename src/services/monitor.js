@@ -20,7 +20,7 @@ import { cargarUbicacionGuardada } from './location';
 import { iniciarCuentaAtras } from './emergencia';
 import { registrarEvento, TIPO } from './bitacora';
 import { registrarFuente, marcarAlarmado } from './episodio';
-import { medir } from './sismografo';
+import { medir, vigilarReplicas } from './sismografo';
 
 /** Ventana para reglas de evento unico. Independiente de la de enjambre. */
 const VENTANA_EVENTO_MIN = 60;
@@ -309,8 +309,14 @@ export async function ejecutarCiclo() {
   // Ventana de medida. Llega tarde para el sismo principal —la sacudida termino
   // hace minutos— asi que aqui no mide el evento: mide lo que si esta por venir,
   // que son las replicas, y si el telefono se mueve o quedo inmovil.
+  //
+  // Tras una alerta roja se pasa a VIGILAR durante horas, a ritmo bajo y con el
+  // sensor acumulando en tandas. Es el unico caso donde el retraso del feed deja
+  // de importar: una replica llega horas despues, asi que 4-7 minutos son
+  // irrelevantes y lo que hace falta es estar escuchando cuando ocurra.
   try {
-    medir(nivel, settings);
+    if (nivel === 'red') vigilarReplicas(settings);
+    else medir(nivel, settings);
   } catch (e) {
     console.log('No se pudo abrir la ventana de medida:', e);
   }

@@ -20,7 +20,7 @@ import notifee, {
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ejecutarCiclo } from './monitor';
-import { revisarVencimiento } from './emergencia';
+import { revisarVencimiento, cargarEstadoEmergencia } from './emergencia';
 import { hayInternet, suscribirRed, enModoAvion } from './red';
 import { marcarSinConexion } from './health';
 import { registrarEvento, TIPO } from './bitacora';
@@ -35,6 +35,22 @@ const INTERVALO_MS = 60000;
  * una red de seguridad: el despertar de verdad lo dispara el listener de red.
  */
 const INTERVALO_HIBERNANDO_MS = 300000;
+
+/**
+ * Ritmo mientras el protocolo de emergencia esta ACTIVADO.
+ *
+ * Si el protocolo vencio sin confirmacion, se asume que el usuario no puede
+ * responder. Preguntarle al USGS cada minuto en ese estado gasta radio, datos y
+ * bateria para producir un aviso que nadie va a leer, y la bateria es
+ * literalmente la ventana de rescate: la propia ficha le dice a quien busca que
+ * cuando se agote, la señal desaparece.
+ *
+ * No se apaga del todo a proposito. La bitacora es el registro permanente de lo
+ * que ocurrio, y el contexto sismico de esas horas —las replicas, sobre todo—
+ * tiene valor despues. Quince minutos conservan el registro quitando el 93% del
+ * trabajo de radio.
+ */
+const INTERVALO_EMERGENCIA_MS = 900000;
 
 /** Marca de vida del bucle. La usa el vigilante para saber si sigue corriendo. */
 export const LATIDO_KEY = 'alerta_sismo_latido_v1';
@@ -174,7 +190,21 @@ notifee.registerForegroundService(() => {
       }
 
       if (!corriendo) break;
-      await esperar(hibernando ? INTERVALO_HIBERNANDO_MS : INTERVALO_MS);
+
+      // El protocolo activado manda sobre todo lo demas: el usuario no puede
+      // responder y cada consulta le quita minutos de baliza.
+      let enEmergencia = false;
+      try {
+        enEmergencia = !!(await cargarEstadoEmergencia()).activada;
+      } catch (e) {
+        enEmergencia = false;
+      }
+
+      await esperar(
+        enEmergencia
+          ? INTERVALO_EMERGENCIA_MS
+          : (hibernando ? INTERVALO_HIBERNANDO_MS : INTERVALO_MS)
+      );
     }
     resolve();
   });

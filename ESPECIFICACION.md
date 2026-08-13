@@ -348,6 +348,23 @@ No reportó **ningún** sismo colombiano bajo M4.0. La franja M3.5-3.9 de la reg
 **Sistema de Google**
 Alerta solo desde **M4.5**. Su primera alerta en un M6.7 en Filipinas salió a los **18,3 s**. Ha fallado de forma grave: en el terremoto de Turquía de 2023 estimó M4.5-4.9 lo que era M7.8 y envió 469 alertas de nivel alto donde correspondían ~10 millones. **Es la vía más rápida disponible y a la vez no es suficiente por sí sola.**
 
+**Cada componente corre solo cuando se le necesita** *(decisión de diseño, no medida)*
+Nada queda encendido "por si acaso". El reparto es este:
+
+| Componente | Cuándo corre |
+|---|---|
+| Sondeo del USGS | Cada 60 s con monitoreo activo. **Cada 15 min si el protocolo de emergencia se disparó**, y cada 5 min sin internet |
+| Ventana de medida a 100 Hz | Solo tras un disparo, y acotada en segundos |
+| Vigilancia de réplicas a 5 Hz | Solo tras una alerta roja, y con el sensor acumulando en tandas |
+| Escucha de la alerta de Google | Siempre, pero la vincula el sistema y solo despierta cuando llega una notificación |
+| Malla de bitchat | Solo durante la emergencia, con plazo máximo de encendido |
+| Balizas Bluetooth y sonora | Solo durante la emergencia |
+| Lectura del GPS | Solo al abrir la app, como mucho cada 12 h |
+
+**Con el protocolo activado se espacia el sondeo del feed.** Si venció sin confirmación se asume que el usuario no puede responder, así que consultar cada minuto gasta radio y batería para producir un aviso que nadie va a leer. Y la batería es literalmente la ventana de rescate: la propia ficha le dice a quien busca que cuando se agote, la señal desaparece. No se apaga del todo porque el registro sísmico de esas horas —las réplicas sobre todo— tiene valor después.
+
+**El sensor tiene dos modos y la diferencia decide la batería.** En ventana corta sostiene el procesador despierto y recibe las muestras al instante, que es lo que exige medir un sismo. En la vigilancia de réplicas no lo sostiene: le pide al coprocesador de sensores que **acumule y entregue en tandas**, como hacen los pulsómetros para medir todo el día. Un wake lock de seis horas arrasaría la carga justo cuando más falta hace. El precio es que ahí el aviso llega con retraso, y se acepta: en ese modo se están *registrando* réplicas, no avisando de ellas.
+
 **Entorno de referencia**
 Redmi Note 13 Pro, Android 16 (SDK 36), HyperOS OS3.0, Play Services 26.29.32. La app apunta a `targetSdkVersion` 34 deliberadamente, para quedar fuera del límite de 6 horas que Android 15 impone a los servicios en primer plano de tipo `dataSync`.
 
