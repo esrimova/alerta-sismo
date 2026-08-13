@@ -24,7 +24,7 @@ import * as Notifications from 'expo-notifications';
 import {
   iniciarBaliza, detenerBaliza, estadoBluetooth,
   estadoMalla, activarMalla, desactivarMalla,
-  subirVolumenBaliza, restaurarVolumen,
+  subirVolumenBaliza, restaurarVolumen, nivelBateria,
 } from '../../modules/emergencia';
 import { cargarUbicacionGuardada } from './location';
 import { verificarInternet } from './red';
@@ -254,10 +254,52 @@ const TRAMOS_SONIDO = [
   { hastaMin: Infinity, cadaSeg: 1800 },
 ];
 
+/**
+ * Piso de cadencia segun la carga que queda.
+ *
+ * El tramo por tiempo da por hecho que se empieza con bateria. Si la emergencia
+ * arranca al 15%, sonar cada 30 s durante la primera hora apaga el telefono
+ * antes de que llegue nadie: se pierden a la vez la baliza, la malla y la
+ * posibilidad de pedir ayuda. Con poca carga, cada emision cuesta minutos de
+ * seguir existiendo.
+ *
+ * Manda SIEMPRE el mas lento de los dos criterios. Con bateria de sobra no
+ * estorba; con bateria escasa se impone al reloj.
+ */
+const TRAMOS_BATERIA = [
+  { desdePct: 50, minimoSeg: 0 },     // holgado: manda el tiempo
+  { desdePct: 20, minimoSeg: 120 },
+  { desdePct: 10, minimoSeg: 600 },
+  { desdePct: 0, minimoSeg: 1800 },
+];
+
+function minimoPorBateria() {
+  let bat = null;
+  try { bat = nivelBateria(); } catch (e) { bat = null; }
+
+  // Enchufado no hay nada que racionar: si entra corriente, la carga deja de
+  // ser el recurso escaso.
+  if (bat?.cargando) return 0;
+
+  // Sin lectura se deja mandar al reloj. La lectura casi nunca falla, y asumir
+  // lo peor penalizaria a un telefono lleno justo en la hora que mas importa.
+  if (bat?.porcentaje == null) return 0;
+
+  const tramo = TRAMOS_BATERIA.find((t) => bat.porcentaje >= t.desdePct)
+    || TRAMOS_BATERIA[TRAMOS_BATERIA.length - 1];
+  return tramo.minimoSeg * 1000;
+}
+
+/**
+ * Cuanto esperar hasta la siguiente emision.
+ *
+ * Se recalcula en CADA emision, asi que la cadencia se va frenando sola a medida
+ * que baja la carga, sin necesidad de vigilar la bateria por separado.
+ */
 function cadenciaSonido(desdeMs) {
   const min = (Date.now() - desdeMs) / 60000;
   const tramo = TRAMOS_SONIDO.find((t) => min < t.hastaMin) || TRAMOS_SONIDO[TRAMOS_SONIDO.length - 1];
-  return tramo.cadaSeg * 1000;
+  return Math.max(tramo.cadaSeg * 1000, minimoPorBateria());
 }
 
 function iniciarSonido() {

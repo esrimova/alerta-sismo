@@ -366,7 +366,17 @@ Nada queda encendido "por si acaso". El reparto es este:
 
 **La baliza sonora suena al máximo del sistema y va espaciándose.** Subir el volumen del sistema no es un detalle: poner el reproductor al 100% solo da el 100% *de lo que tenga puesto el teléfono*, y de madrugada suele estar bajo — justo cuando el usuario menos puede reaccionar. Se guarda el volumen previo y se devuelve al terminar.
 
-La cadencia no es fija porque el problema cambia con el tiempo: cada 30 s la primera hora, cada 5 min hasta la cuarta, y cada 30 min a partir de ahí. En la primera hora quien busca son vecinos que están al lado *ahora*. Pasado ese rato el rescate se mide en días y lo que decide si te encuentran deja de ser la frecuencia y pasa a ser cuánto dura la batería: una baliza que suena cada 30 s y muere en ocho horas pierde contra una que suena cada media hora durante tres días. En 24 horas son 196 emisiones en vez de 2880.
+**La cadencia depende del tiempo Y de la carga, y manda el más lento de los dos.** Por tiempo: cada 30 s la primera hora, cada 5 min hasta la cuarta, cada 30 min a partir de ahí. En la primera hora quien busca son vecinos que están al lado *ahora*; después el rescate se mide en días y lo que decide si te encuentran deja de ser la frecuencia sino cuánto dura la batería.
+
+Pero el criterio del reloj **da por hecho que se empieza con batería**, y no siempre es así. Si la emergencia arranca al 15%, sonar cada 30 s durante la primera hora apaga el teléfono antes de que llegue nadie, y con él se van la baliza, la malla y cualquier posibilidad de pedir ayuda. Por eso la carga impone un piso: sin restricción por encima del 50%, mínimo 2 min entre 20 y 50, 10 min entre 10 y 20, y media hora por debajo del 10%. Enchufado no se raciona nada.
+
+Se recalcula en cada emisión, así que la baliza se va frenando sola conforme baja la carga.
+
+| Carga al activarse | Emisiones en 72 h |
+|---|---|
+| 100% | 292 |
+| 40% | 202 |
+| 15% | 160 |
 
 **El sensor tiene dos modos y la diferencia decide la batería.** En ventana corta sostiene el procesador despierto y recibe las muestras al instante, que es lo que exige medir un sismo. En la vigilancia de réplicas no lo sostiene: le pide al coprocesador de sensores que **acumule y entregue en tandas**, como hacen los pulsómetros para medir todo el día. Un wake lock de seis horas arrasaría la carga justo cuando más falta hace. El precio es que ahí el aviso llega con retraso, y se acepta: en ese modo se están *registrando* réplicas, no avisando de ellas.
 
