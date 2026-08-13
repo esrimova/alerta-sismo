@@ -446,6 +446,10 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
    * forma de mandar los datos médicos sin mandar también la dirección.
    */
   const renderModalFicha = () => {
+    // La configuracion de emergencia se carga despues que los ajustes, asi que
+    // hay un render en el que ya paso el guarda de settings pero emerg sigue
+    // siendo null. Sin esto, la app se cae al arrancar.
+    if (!emerg) return null;
     const f = emerg.ficha || {};
     const casa = evaluarSiEstaEnCasa(emerg, ubicacion);
 
