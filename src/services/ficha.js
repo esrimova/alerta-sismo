@@ -39,10 +39,20 @@ export const FICHA_DEFECTO = {
   medicos: '',
   /** Apartamento, piso, referencia. Solo sale si estás allí. */
   casa: '',
+  /**
+   * Quién más vive aquí. Va atado a la misma regla que la dirección: si el
+   * usuario no está en casa, no se envía. Decirle a un rescatista "aquí también
+   * vive mi madre" cuando el afectado está a veinte kilómetros lo mandaría a
+   * buscar a alguien que no corre peligro, y peor, le haría perder tiempo.
+   */
+  convivientes: '',
   /** Coordenadas de casa, para decidir si estás en ella. */
   casaLat: null,
   casaLon: null,
 };
+
+/** Un contacto de emergencia. La configuración guarda una lista de estos. */
+export const CONTACTO_DEFECTO = { nombre: '', telefono: '' };
 
 /** Límite del anuncio BLE: 31 bytes de paquete, y el nombre es lo único que cabe. */
 export const MAX_BALIZA = 26;
@@ -183,10 +193,15 @@ export function componerFicha(cfg, estado, ubicacion = null) {
 
   bloques.push('⚠️ MENSAJE AUTOMÁTICO — no lo escribió una persona.');
 
-  const quien = nombre ? `Soy ${nombre}.` : 'Soy el dueño de este teléfono.';
+  // Lo primero tiene que ser quién es y qué necesita. La versión anterior
+  // explicaba el mecanismo —"no confirmé estar bien después de un sismo"— y eso
+  // no significa nada para alguien que acaba de instalar una app para ayudar:
+  // obliga a descifrar cómo funciona la app antes de entender que hay una
+  // persona en problemas.
+  const quien = nombre ? `Soy ${nombre} y necesito ayuda.` : 'Necesito ayuda.';
   bloques.push(
-    `${quien} Es posible que no esté consciente. Mi teléfono envió esto solo, ` +
-    'porque no confirmé estar bien después de un sismo.'
+    `${quien} Es posible que esté inconsciente o atrapado: este mensaje lo ` +
+    'envió mi teléfono por su cuenta, al ver que yo no respondía.'
   );
 
   // DÓNDE ESTOY va primero: es lo que decide si quien lee puede hacer algo.
@@ -216,8 +231,6 @@ export function componerFicha(cfg, estado, ubicacion = null) {
     donde.push('Mi teléfono no tiene una ubicación reciente.');
   }
 
-  // Recordatorio del alcance: si te llegó esto por Bluetooth, está cerca.
-  donde.push('Si recibes esto por la malla, estoy a pocos metros o a pocos saltos.');
   bloques.push(`DÓNDE ESTOY\n${donde.join('\n')}`);
 
   if (f.medicos.trim()) {
@@ -242,9 +255,25 @@ export function componerFicha(cfg, estado, ubicacion = null) {
   }
   if (situacion.length) bloques.push(`SITUACIÓN\n${situacion.join('\n')}`);
 
-  if (cfg?.contactoTelefono) {
-    const c = cfg.contactoNombre ? `${cfg.contactoNombre} ` : '';
-    bloques.push(`CONTACTO DE EMERGENCIA\n${c}${cfg.contactoTelefono}`);
+  const contactos = (cfg?.contactos || [])
+    .filter((c) => String(c?.telefono || '').trim())
+    .map((c) => {
+      const n = String(c.nombre || '').trim();
+      return n ? `${n} — ${String(c.telefono).trim()}` : String(c.telefono).trim();
+    });
+  if (contactos.length) {
+    const titulo = contactos.length === 1 ? 'CONTACTO DE EMERGENCIA' : 'CONTACTOS DE EMERGENCIA';
+    bloques.push(`${titulo}\n${contactos.join('\n')}`);
+  }
+
+  // Va atado a la misma regla que la dirección y por el mismo motivo: decirle a
+  // quien ayuda "aquí también vive mi madre" cuando el afectado está a veinte
+  // kilómetros lo manda a buscar a alguien que no corre peligro.
+  if (f.convivientes.trim() && casa.enCasa !== false) {
+    const encabezado = casa.enCasa === true
+      ? 'EN ESTA CASA TAMBIÉN VIVEN'
+      : 'SI ESTOY EN CASA, AQUÍ TAMBIÉN VIVEN';
+    bloques.push(`${encabezado}\n${f.convivientes.trim()}`);
   }
 
   bloques.push(
@@ -262,5 +291,6 @@ export function componerFicha(cfg, estado, ubicacion = null) {
  */
 export function fichaTieneContenido(cfg) {
   const f = { ...FICHA_DEFECTO, ...(cfg?.ficha || {}) };
-  return Boolean(f.medicos.trim() || f.casa.trim());
+  const hayContacto = (cfg?.contactos || []).some((c) => String(c?.telefono || '').trim());
+  return Boolean(f.medicos.trim() || f.casa.trim() || f.convivientes.trim() || hayContacto);
 }

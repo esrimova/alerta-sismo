@@ -341,6 +341,85 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
     }
   };
 
+  const actualizarContacto = async (i, campo, valor) => {
+    const lista = [...(emerg.contactos || [])];
+    lista[i] = { ...lista[i], [campo]: valor };
+    const nueva = { ...emerg, contactos: lista };
+    setEmerg(nueva);
+    await guardarConfigEmergencia(nueva);
+  };
+
+  const anadirContacto = async () => {
+    const nueva = { ...emerg, contactos: [...(emerg.contactos || []), { nombre: '', telefono: '' }] };
+    setEmerg(nueva);
+    await guardarConfigEmergencia(nueva);
+  };
+
+  const quitarContacto = async (i) => {
+    const lista = (emerg.contactos || []).filter((_, n) => n !== i);
+    const nueva = { ...emerg, contactos: lista };
+    setEmerg(nueva);
+    await guardarConfigEmergencia(nueva);
+  };
+
+  /**
+   * Contactos de emergencia, en lista.
+   *
+   * Varios y no uno: tras un sismo, el único contacto podría estar tan
+   * incomunicado como el afectado, porque suele ser familia o vecinos que
+   * comparten la misma zona y la misma caída de red.
+   */
+  const renderContactos = () => {
+    const lista = emerg.contactos || [];
+    return (
+      <View style={styles.subBloque}>
+        <Text style={styles.label}>Contactos de emergencia</Text>
+
+        {lista.length === 0 && (
+          <Text style={styles.endpointTexto}>
+            Sin contactos. Quien te encuentre no tendrá a quién avisar.
+          </Text>
+        )}
+
+        {lista.map((c, i) => (
+          <View key={i} style={styles.contactoFila}>
+            <TextInput
+              style={[styles.input, { flex: 1.1, marginRight: 8 }]}
+              value={c.nombre}
+              onChangeText={(v) => actualizarContacto(i, 'nombre', v)}
+              placeholder="María Rivera"
+              placeholderTextColor="#64748B"
+            />
+            <TextInput
+              style={[styles.input, { flex: 1, marginRight: 8 }]}
+              keyboardType="phone-pad"
+              value={c.telefono}
+              onChangeText={(v) => actualizarContacto(i, 'telefono', v)}
+              placeholder="3001234567"
+              placeholderTextColor="#64748B"
+            />
+            <TouchableOpacity onPress={() => quitarContacto(i)} style={styles.quitar}>
+              <Text style={styles.quitarTexto}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        <TouchableOpacity
+          style={[styles.simButton, { backgroundColor: '#334155', marginTop: 8 }]}
+          onPress={anadirContacto}
+        >
+          <Text style={styles.buttonText}>Añadir contacto</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.endpointTexto}>
+          Estos números los verá quien te encuentre. No pongas el tuyo: si estás
+          inconsciente, a ti no te pueden llamar. Pon más de uno, porque tras un sismo
+          el primero puede estar tan incomunicado como tú.
+        </Text>
+      </View>
+    );
+  };
+
   /**
    * Editor del texto de la baliza.
    *
@@ -489,6 +568,21 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
             placeholderTextColor="#64748B"
           />
 
+          <Text style={[styles.label, { marginTop: 20 }]}>En esta casa también viven</Text>
+          <TextInput
+            style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+            multiline
+            value={f.convivientes}
+            onChangeText={(v) => actualizarFicha('convivientes', v)}
+            placeholder={'Mi madre, 70 años, camina con bastón.\nDuerme en el cuarto del fondo.'}
+            placeholderTextColor="#64748B"
+          />
+          <Text style={styles.endpointTexto}>
+            Solo se envía cuando estás en casa, igual que la dirección: decirle a quien
+            ayuda que aquí vive alguien más, estando tú a veinte kilómetros, lo mandaría
+            a buscar a una persona que no corre peligro.
+          </Text>
+
           <View style={styles.estadoFila}>
             <Text style={styles.estadoEtiqueta}>Ubicación de casa</Text>
             <Text style={[
@@ -583,28 +677,20 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
 
         {emerg.activo && (
           <>
-            <Text style={styles.label}>Mi nombre</Text>
+            <Text style={styles.label}>Nombre y apellido</Text>
             <TextInput
               style={styles.input}
               value={emerg.miNombre}
               onChangeText={(v) => actualizarEmerg('miNombre', v)}
-              placeholder="Esteban"
-              placeholderTextColor="#64748B"
-            />
-
-            <Text style={styles.label}>Teléfono del contacto de emergencia</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="phone-pad"
-              value={emerg.contactoTelefono}
-              onChangeText={(v) => actualizarEmerg('contactoTelefono', v)}
-              placeholder="3001234567"
+              placeholder="Esteban Rivera"
               placeholderTextColor="#64748B"
             />
             <Text style={styles.endpointTexto}>
-              Este número es el que verá quien te encuentre. No es el tuyo: si estás
-              inconsciente, a ti no te pueden llamar.
+              Con apellido: quien te encuentre no te conoce, y un nombre suelto no le
+              sirve para dar razón de ti a nadie.
             </Text>
+
+            {renderContactos()}
 
             <Text style={[styles.label, { marginTop: 20 }]}>Minutos de espera</Text>
             <TextInput
@@ -1199,6 +1285,19 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 50
+  },
+  contactoFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  quitar: {
+    padding: 10,
+  },
+  quitarTexto: {
+    color: '#EF4444',
+    fontSize: 18,
+    fontWeight: '800',
   },
   subBloque: {
     marginTop: 8,

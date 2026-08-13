@@ -37,9 +37,14 @@ export const MINUTOS_ESPERA_DEFECTO = 60;
 
 export const CONFIG_DEFECTO = {
   activo: false,
+  /** Nombre y apellido: quien lo lee no conoce al afectado. */
   miNombre: '',
-  contactoNombre: '',
-  contactoTelefono: '',
+  /**
+   * Varios contactos, no uno. Si hay un sismo, el unico contacto podria estar
+   * igual de incomunicado que el afectado: son vecinos o familia y comparten
+   * la misma zona y la misma caida de red.
+   */
+  contactos: [],
   minutosEspera: MINUTOS_ESPERA_DEFECTO,
   usarBluetooth: true,
   usarSonido: true,
@@ -74,6 +79,24 @@ function sanear(guardada) {
   for (const clave of Object.keys(FICHA_DEFECTO)) {
     if (fichaGuardada[clave] !== undefined) limpia.ficha[clave] = fichaGuardada[clave];
   }
+
+  // El contacto unico paso a ser una lista. Sin este traspaso, quien ya tenia
+  // la app perderia el telefono que habia configurado —el unico dato que
+  // permite avisar a su familia— al actualizar, y no se enteraria hasta la
+  // emergencia.
+  if (!Array.isArray(limpia.contactos) || limpia.contactos.length === 0) {
+    const viejoTel = String(guardada.contactoTelefono || '').trim();
+    limpia.contactos = viejoTel
+      ? [{ nombre: String(guardada.contactoNombre || '').trim(), telefono: viejoTel }]
+      : [];
+  }
+  limpia.contactos = limpia.contactos
+    .map((c) => ({
+      nombre: String(c?.nombre || '').trim(),
+      telefono: String(c?.telefono || '').trim(),
+    }))
+    .filter((c) => c.nombre || c.telefono);
+
   return limpia;
 }
 
