@@ -11,4 +11,15 @@
                    android:usesPermissionFlags="neverForLocation" />
   <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+  <!-- Permiso que exige el fork de bitchat para dejarse encender. Es de nivel
+       de firma, asi que solo funciona porque las dos apps van firmadas con la
+       misma clave. -->
+  <uses-permission android:name="com.bitchat.droid.permission.EMERGENCIA" />
+
+  <!-- Android 11+ oculta las apps instaladas salvo que se declaren. Sin esto,
+       la comprobacion de si bitchat esta instalado diria siempre que no. -->
+  <queries>
+    <package android:name="com.bitchat.droid" />
+  </queries>
+
 </manifest>

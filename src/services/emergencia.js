@@ -21,10 +21,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PermissionsAndroid, Platform } from 'react-native';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as Notifications from 'expo-notifications';
-import { iniciarBaliza, detenerBaliza, estadoBluetooth } from '../../modules/emergencia';
+import {
+  iniciarBaliza, detenerBaliza, estadoBluetooth,
+  estadoMalla, activarMalla, desactivarMalla,
+} from '../../modules/emergencia';
+import { cargarUbicacionGuardada } from './location';
 import { SOUND_URLS } from './alert';
 import { registrarEvento, TIPO } from './bitacora';
-import { FICHA_DEFECTO, balizaPorDefecto, recortarBaliza } from './ficha';
+import { FICHA_DEFECTO, balizaPorDefecto, recortarBaliza, componerFicha, fichaTieneContenido } from './ficha';
 
 const CONFIG_KEY = 'alerta_sismo_emergencia_v1';
 const ESTADO_KEY = 'alerta_sismo_emergencia_estado_v1';
@@ -150,9 +154,16 @@ export async function confirmarEstoyBien() {
   detenerSonido();
   try { detenerBaliza(); } catch (e) {}
 
+  // Apaga la malla y hace que bitchat BORRE la ficha de su lado. Dejarla
+  // guardada seria dejar datos medicos en una app que ya no los necesita, y a
+  // merced de que un fallo posterior volviera a encender el modo por error.
+  let malla = null;
+  try { malla = desactivarMalla(); } catch (e) { malla = { ok: false, motivo: 'excepcion' }; }
+
   registrarEvento({
     tipo: TIPO.PROTOCOLO,
     subtipo: 'estoy_bien',
+    malla,
     // Cuanto tardo en confirmar. Si el protocolo ya se habia activado, indica
     // que la confirmacion llego tarde.
     trasActivacion: !!previo.activada,
@@ -227,6 +238,34 @@ export function textoDeBaliza(cfg) {
 }
 
 /**
+ * Enciende la malla de bitchat con la ficha ya compuesta.
+ *
+ * La ficha se compone AQUI y no en bitchat porque solo esta app sabe lo que
+ * hace falta para armarla: si el usuario esta en su casa, cuanta bateria queda
+ * y cuanto lleva activada la emergencia. bitchat solo la reenvia tal cual.
+ *
+ * Devuelve siempre un objeto con motivo, nunca lanza: que falle la malla no
+ * puede impedir que suenen la baliza sonora y la de Bluetooth, que son las que
+ * no dependen de que nadie tenga una app instalada.
+ */
+async function encenderMalla(cfg, estado) {
+  try {
+    const est = estadoMalla();
+    if (!est.instalado) return { ok: false, motivo: 'bitchat_no_instalado' };
+    if (!est.esFork) return { ok: false, motivo: 'bitchat_sin_puente' };
+    if (!fichaTieneContenido(cfg)) return { ok: false, motivo: 'ficha_vacia' };
+
+    const ubicacion = await cargarUbicacionGuardada();
+    const texto = componerFicha(cfg, estado, ubicacion);
+    const episodio = String(estado?.activadaEn || Date.now());
+    const r = activarMalla(texto, textoDeBaliza(cfg), episodio);
+    return { ...r, enviadoEn: Date.now() };
+  } catch (e) {
+    return { ok: false, motivo: e?.message || 'excepcion' };
+  }
+}
+
+/**
  * Vencio el plazo sin confirmacion. Activa todo lo configurado.
  * Cada mecanismo se ejecuta por separado: que falle uno no impide los otros.
  */
@@ -251,6 +290,15 @@ export async function activarProtocolo() {
     iniciarSonido();
     resultado.sonido = true;
   }
+
+  // Tercera capa de alcance: la malla. Llega mucho mas lejos que la baliza
+  // —varios saltos, y conversacion real— pero exige que quien te encuentre
+  // tenga la app. Por eso no sustituye a las otras dos, se suma.
+  //
+  // Aqui es donde Alerta Sismo enciende bitchat. No corre antes: mantener la
+  // malla viva todo el tiempo gastaria bateria sin parar para cubrir un evento
+  // que puede no ocurrir en años.
+  resultado.malla = await encenderMalla(cfg, estado);
 
   await guardarEstado({ ...estado, esperandoConfirmacion: false, activada: true, activadaEn: Date.now() });
 

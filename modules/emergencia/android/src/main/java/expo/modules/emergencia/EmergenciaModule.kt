@@ -155,6 +155,27 @@ class EmergenciaModule : Module() {
       mapOf("ok" to true)
     }
 
+    /** ¿Esta instalado el fork de bitchat con el puente de emergencia? */
+    Function("estadoMalla") {
+      PuenteMalla.estado(contexto)
+    }
+
+    /**
+     * Enciende la malla de bitchat y le entrega la ficha.
+     *
+     * Alerta Sismo es el disparador: bitchat no corre todo el tiempo porque
+     * mantener la malla viva gastaria bateria sin parar para cubrir un evento
+     * que puede no ocurrir en años.
+     */
+    Function("activarMalla") { ficha: String, apodo: String, episodio: String ->
+      PuenteMalla.activar(contexto, ficha, apodo, episodio)
+    }
+
+    /** Apaga la malla y borra la ficha del otro lado. */
+    Function("desactivarMalla") {
+      PuenteMalla.desactivar(contexto)
+    }
+
     /**
      * Carga restante del telefono.
      *

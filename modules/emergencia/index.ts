@@ -60,3 +60,36 @@ export function puedePantallaCompleta(): boolean {
 export function abrirAjustesPantallaCompleta(): Resultado {
   return Emergencia.abrirAjustesPantallaCompleta();
 }
+
+export type EstadoMalla = {
+  instalado: boolean;
+  esFork: boolean;
+  /** 'no_instalado' | 'version_sin_puente' | null */
+  motivo: string | null;
+};
+
+/**
+ * ¿Está el fork de bitchat instalado y expone el puente?
+ *
+ * Distingue "no está bitchat" de "está la versión de la tienda, que no expone
+ * nada": son situaciones distintas y el usuario tiene que saber cuál le pasa.
+ */
+export function estadoMalla(): EstadoMalla {
+  return Emergencia.estadoMalla();
+}
+
+/**
+ * Enciende la malla de bitchat y le entrega la ficha.
+ *
+ * Alerta Sismo es el disparador: bitchat no corre todo el tiempo porque
+ * mantener la malla viva gastaría batería sin parar para cubrir un evento que
+ * puede no ocurrir en años.
+ */
+export function activarMalla(ficha: string, apodo: string, episodio: string): Resultado {
+  return Emergencia.activarMalla(ficha, apodo, episodio);
+}
+
+/** Apaga la malla y borra la ficha del otro lado. */
+export function desactivarMalla(): Resultado {
+  return Emergencia.desactivarMalla();
+}
