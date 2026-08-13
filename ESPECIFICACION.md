@@ -434,6 +434,8 @@ guardado por Play Services en preferencias no legibles sin root.
 
 **La licencia real es GPL v3, no dominio público.** El README dice literalmente *"released into the public domain"* y enlaza a `LICENSE.md`, pero ese archivo son 674 líneas de GNU GPL v3. El repositorio se contradice a sí mismo. Ante la duda manda el archivo de licencia.
 
+**La contradicción no hay que resolverla, y no es un pendiente.** Solo importaría si se quisiera usar la lectura permisiva. Al tratar el fork como GPL v3 —que es la estricta— se cumple bajo cualquiera de las dos interpretaciones: si es GPL v3, se cumple; si fuera dominio público, se estaría siendo más restrictivo de lo exigido, y eso nunca incumple nada. Solo habría que aclararlo si algún día se quisiera relicenciar el fork bajo otra cosa.
+
 Consecuencia directa: **bifurcar y modificar está permitido**, pero un derivado distribuido debe publicarse bajo GPL v3. E **incorporar código de bitchat dentro de Alerta Sismo arrastraría toda la app a GPL v3**. La arquitectura de dos apps separadas comunicándose por IPC evita esa propagación, y por eso es la elegida.
 
 **El código de `main` va por delante de la versión publicada.** Play Store distribuye la **1.7.4** (código 35); `main` compila la **2.0.1** (código 38). Entre ambas el protocolo pudo cambiar, así que **las pruebas de malla deben hacerse primero con la misma versión en ambos equipos**. Probar 2.0.1 contra 1.7.4 mide algo distinto —si el fork podrá hablar con quien tenga la versión de tienda— y también hace falta, pero por separado.
@@ -493,7 +495,6 @@ En Xiaomi la instalación por cable falla con `INSTALL_FAILED_USER_RESTRICTED` *
 - Confirmar que el interruptor maestro de las Alertas de Terremotos de Google está activo. Los canales existen y no están bloqueados (§5), pero el interruptor lo guarda Play Services en preferencias no legibles sin root.
 - Zanjar cuál de `eew_alert_v2` y `eew_notification_v2` es "Toma medidas". La configuración de los canales apunta al primero (§5) pero no lo demuestra; solo una alerta real lo confirma, y la app ya guarda los extras crudos de cada una para resolverlo en cuanto ocurra.
 - Ajustar el intérprete del texto de Google a su redacción real en español. Hasta que llegue una alerta real se trabaja a ciegas, y por eso nada depende de que funcione.
-- Abrir un issue en bitchat pidiendo que aclaren la contradicción de licencia entre README y `LICENSE.md`. Hace falta certeza antes de publicar un derivado.
 - **El `LICENSE` de este repo es el MIT que trae Expo por defecto, con copyright de "650 Industries, Inc. (aka Expo)".** No es el de este proyecto. Hay que reemplazarlo antes de publicar.
 - Que el apodo del nodo en la malla pase a `SOS <nombre> ap<apto>` durante la emergencia. Sin eso, quien instale bitchat recibe la ficha automáticamente pero no ve ninguna señal de auxilio en su lista de pares.
 - **"Instala bitchat" exige internet, justo lo que se cae tras un sismo.** Funciona para familia que ya lo tenga; no para un rescatista externo. Sin resolver.
