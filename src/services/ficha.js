@@ -326,12 +326,18 @@ function componerCanal(cfg, red) {
     return lineas.join('\n');
   }
 
-  if (red.avion) {
-    return 'Mi teléfono está en modo avión, así que esta red es el único canal por el que me llega algo.';
-  }
+  // Sin internet no se ofrece el WhatsApp: mandar a alguien a escribir a un
+  // numero inalcanzable le hace perder minutos. Y se le advierte de lo que de
+  // verdad importa aqui, que es que este canal depende de la distancia.
+  const cabecera = red.avion
+    ? 'Mi teléfono está en modo avión, así que no tengo internet.'
+    : 'Mi teléfono no tiene internet.';
+
   return (
-    'Mi teléfono no tiene internet, así que esta red es el único canal por el ' +
-    'que me llega algo. No pierdas tiempo escribiéndome por otro lado.'
+    `${cabecera} Esta red funciona por Bluetooth, así que si te alejas nos ` +
+    'quedamos incomunicados.\n' +
+    'Aunque es posible que esté inconsciente, déjame las instrucciones que ' +
+    'necesite: en cuanto pueda te contestaré.'
   );
 }
 
