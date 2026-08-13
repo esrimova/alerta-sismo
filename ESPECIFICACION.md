@@ -197,8 +197,8 @@ Donde la app tiene más valor único y menos construido.
 | Baliza Bluetooth visible sin emparejar, con texto editable | **construido** |
 | Baliza sonora periódica para localización bajo escombros | **construido** |
 | Vigilancia de réplicas con el acelerómetro tras una alerta roja | **construido**, pendiente verificar que HyperOS no la mate |
-| Malla Bluetooth mediante fork de bitchat, encendida y apagada por esta app | **construido**, pendiente probar entre dos aparatos |
-| Ficha de triaje automática por la malla | **construido**, pendiente probar entre dos aparatos |
+| Malla Bluetooth mediante fork de bitchat, encendida y apagada por esta app | **construido** y probado: dos teléfonos se ven y conversan |
+| Ficha de triaje automática por la malla | **construido**, pendiente: llega al segundo teléfono pero no se muestra (ver §7) |
 | Apodo SOS visible en la lista de pares de la malla | **decidido** |
 | Ventana de vigilancia de réplicas dimensionada con la ley de Omori | **abierto** |
 | Detección de inmovilidad del teléfono como señal para el hombre muerto | **abierto** |
@@ -234,6 +234,12 @@ Con ese espacio libre la baliza lleva ahora **dónde está y por qué canal se s
 
 #### Ficha de triaje
 
+**El reparto es continuo, no un envío.** El objetivo no es que la ficha llegue a alguien sino a cuantos más mejor: cada par recibe su propia copia y que uno la tenga no quita nada a los demás. Un ciclo de veinte segundos mira quién está conectado y a quién le falta; los eventos de descubrimiento se conservan porque avisan antes, pero quien garantiza el reparto es el ciclo. Depender solo de eventos dejaba fuera el caso más probable: que los teléfonos ya se vieran al vencer el protocolo, sin ningún cambio que disparar.
+
+**Se confirma, no se supone.** bitchat devuelve acuse de recibo, así que un par deja de reintentarse cuando confirma y no cuando se le mandó. Mientras no llegue el acuse se reintenta cada minuto.
+
+**El registro es por episodio.** Si la baliza se activa de nuevo, todos vuelven a recibirla, incluida la misma persona que ya la tenía: es una emergencia nueva y la ficha lleva datos que cambian —batería, tiempo transcurrido, ubicación—.
+
 **Se envía al DESCUBRIR a alguien en la malla, no al recibir un mensaje suyo.** Quien encuentra al afectado acaba de instalar la app y no tiene por qué saber que debe escribirle; esperar a que lo haga sería perder el rescate por una convención de interfaz. También se responde a un mensaje entrante, por si el envío del descubrimiento se perdió.
 
 El mensaje está escrito para quien lo lee, no para quien lo programó: abre con nombre completo y la petición directa de ayuda. Explicar el mecanismo —"no confirmé estar bien tras un sismo"— obliga a entender cómo funciona la app antes de entender que hay una persona en problemas.
@@ -256,7 +262,9 @@ Un respondedor siempre activo convierte la app en una fuga de historia clínica 
 
 Al terminar la emergencia se **borra** la ficha del lado del fork, y con ella lo que ese teléfono retuviera para terceros. Dejarlo guardado sería dejar datos de un episodio cerrado a merced de que un fallo posterior encendiera el modo por error.
 
-Se insiste **como mucho tres veces por par y por episodio, separadas cinco minutos**. No es "una sola vez", y la diferencia importa: sin confirmación de entrega, dar por bueno el primer envío deja sin ficha a quien lo pierda —el proceso puede morir antes de enviar, o el mensaje caer en una caché volátil—. El tope existe para no convertir la malla en un bucle cuando el ancho de banda y la batería son lo que más escasea.
+Un par deja de reintentarse **cuando confirma la entrega**, no cuando se le manda. Sin acuse de recibo se reintenta cada minuto mientras siga a la vista, y eso no convierte la malla en un bucle porque el que ya confirmó deja de aparecer en la lista de pendientes.
+
+**Un envío a un par sin sesión cifrada no entrega nada.** bitchat inicia el saludo y descarta el mensaje —"fire and forget, don't queue"—. Para un contacto conocido da igual porque la sesión ya existe; para el desconocido que acaba de instalar la app, que es el caso que importa, el primer envío se pierde siempre. Por eso se comprueba la sesión antes de enviar y se sondea hasta que exista.
 
 #### Arquitectura de la integración
 
@@ -295,7 +303,7 @@ Alcance de eso, para no prometer de más: protege lo que **este** teléfono reti
 
 El riesgo real no es programar: es invertir semanas y descubrir al final que la malla no atraviesa una losa de concreto.
 
-1. **Verificar la malla entre dos aparatos** — sigue sin hacerse, y es lo único que puede confirmar que todo lo demás sirve.
+1. **Verificar la malla entre dos aparatos** — **hecho**. Dos teléfonos se ven y conversan entre sí. Era la puerta que bloqueaba todo el trabajo de la malla, y está pasada.
 2. Compilar el fork sin modificar — **hecho**.
 3. Modo emergencia y servicio expuesto — **hecho**.
 4. Auto-respondedor — **hecho**.
@@ -469,9 +477,43 @@ Puntos a resolver:
 
 **Lo siguiente que hay que hacer, en orden:**
 
-1. **Probar la malla.** Sigue siendo la puerta, y ahora bloquea código ya escrito en vez de código por escribir. Requiere **dos aparatos, como instrumental de prueba** — una malla no se puede verificar con un solo nodo. Instalar **la misma versión compilada** en ambos, probar en la misma habitación, luego con una losa de concreto de por medio, y **con datos y wifi apagados en los dos** — bitchat cae a Nostr por internet cuando la malla no alcanza, así que sin apagar la red se puede creer que funciona el Bluetooth cuando el mensaje viajó por el celular. Medir a qué distancia se pierde.
-2. **Comprobar que la ficha llega sola**, sin que el segundo aparato escriba nada: es la premisa de todo el diseño y hoy no está verificada.
-3. Probar por separado si la versión compilada habla con la de Play Store, que es el escenario de familiares y rescatistas.
+1. **La ficha llega, pero no se muestra.** Es lo siguiente y por donde se retoma.
+   Con dos aparatos y la baliza activa, en el segundo teléfono aparece una
+   notificación pero el mensaje no se ve. Falta distinguir cuál de las dos
+   situaciones es, porque llevan a arreglos distintos:
+   - Si la notificación es la de **"hay una persona conectada"**, que bitchat
+     genera solo al detectar un par, entonces el mensaje sigue sin llegar.
+   - Si es una notificación de **mensaje privado** pero aparece sin contenido, el
+     problema está en el envío o en la presentación.
+
+   Para decidirlo hacen falta tres datos: el texto exacto de la notificación, si
+   al tocarla se abre una conversación, y el registro del teléfono principal
+   durante la prueba. Descartado ya que sea el tamaño: bitchat fragmenta los
+   paquetes grandes por su cuenta.
+
+2. **Verificar el reparto con confirmación.** El registro dirá si hubo envío
+   ("Ficha enviada a X, esperando acuse") y si llegó el acuse ("Entrega
+   CONFIRMADA por X"). Esa pareja de líneas separa un problema de entrega de uno
+   de presentación sin tener que adivinar.
+
+3. **Probar con losa de concreto de por medio y con datos y wifi apagados en los
+   dos aparatos.** bitchat cae a Nostr por internet cuando la malla no alcanza,
+   así que sin apagar la red se puede creer que funciona el Bluetooth cuando el
+   mensaje viajó por el celular. Medir a qué distancia se pierde.
+
+4. **Comprobar que la ficha llega a un desconocido**, en un teléfono donde
+   bitchat se acabe de instalar y sin haber chateado antes. Es la premisa de todo
+   el diseño y el escenario que más veces ha fallado.
+
+5. Probar por separado si la versión compilada habla con la de Play Store, que es
+   el escenario de familiares y rescatistas.
+
+**Cómo queda montado el banco de pruebas**, para no rehacerlo: en el teléfono
+principal está instalada la versión **depurable** del fork, porque la de release
+descarta sus registros internos y sin ellos no se ve nada de lo que pasa dentro
+de la malla. El búfer de registro está ampliado a 32 MB, que hizo falta porque
+con el tamaño por defecto la ventana de una prueba se perdía por rotación antes
+de poder leerla. Al terminar, volver a la versión no depurable.
 
 **Al instalar el fork:** conserva el mismo `applicationId` (`com.bitchat.droid`), así que Android rechaza instalarlo encima del de Play Store y hay que desinstalar ese primero, perdiendo su identidad e historial. Ya está hecho en el equipo de referencia.
 

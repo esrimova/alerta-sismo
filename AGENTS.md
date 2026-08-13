@@ -32,3 +32,18 @@ muevas esa lógica dentro del módulo de Expo.
 ya avisó, el feed del USGS llega después y no vuelve a sonar. Pero la cuenta atrás de
 "Estoy bien" arranca igual: que Google avisara antes no significa que el usuario esté
 bien, significa lo contrario. Ver `ejecutarCiclo()` en `src/services/monitor.js`.
+
+# Por dónde se retoma
+
+Lo siguiente está en §7 de @ESPECIFICACION.md, punto 1: **la ficha llega al
+segundo teléfono pero no se muestra**. Hace falta el texto exacto de la
+notificación, si al tocarla se abre una conversación, y el registro del teléfono
+principal durante la prueba.
+
+El banco de pruebas está montado y conviene no deshacerlo: el fork está
+instalado en su versión **depurable**, porque la de release descarta sus
+registros internos, y el búfer de registro está ampliado a 32 MB porque con el
+tamaño por defecto la ventana de una prueba se perdía por rotación antes de
+poder leerla. Al terminar hay que volver a la versión no depurable, que es la
+que cierra el hallazgo de seguridad de que su almacenamiento privado se puede
+leer por USB.
