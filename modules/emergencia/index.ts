@@ -32,6 +32,21 @@ export function detenerBaliza(): Resultado {
   return Emergencia.detenerBaliza();
 }
 
+export type Bateria = {
+  /** null si el sistema no lo reporta. */
+  porcentaje: number | null;
+  cargando: boolean;
+};
+
+/**
+ * Carga restante. Va en la ficha de triaje porque marca el plazo en que la
+ * señal del telefono va a dejar de existir, y eso determina la prioridad de un
+ * rescate frente a otro.
+ */
+export function nivelBateria(): Bateria {
+  return Emergencia.nivelBateria();
+}
+
 /**
  * ¿Puede la app encender la pantalla y mostrarse sobre el bloqueo?
  * Android 14 restringio USE_FULL_SCREEN_INTENT a apps de llamadas y alarmas;

@@ -10,8 +10,10 @@ import android.bluetooth.le.BluetoothLeAdvertiser
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.BatteryManager
 import android.provider.Settings
 import android.os.Build
 import androidx.core.content.ContextCompat
@@ -151,6 +153,29 @@ class EmergenciaModule : Module() {
         // Sin permiso no se puede restaurar; se informa igual.
       }
       mapOf("ok" to true)
+    }
+
+    /**
+     * Carga restante del telefono.
+     *
+     * Es uno de los dos datos que un equipo de rescate no puede obtener de
+     * ninguna otra forma: marca el plazo en que la señal va a dejar de existir.
+     * Un 8% dice que quedan minutos para encontrar a esta persona por radio; un
+     * 80% dice que hay tiempo. Sin el, quien recibe la ficha no puede priorizar.
+     */
+    Function("nivelBateria") {
+      return@Function try {
+        val bm = contexto.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+        val pct = bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
+        val estado = contexto.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val plug = estado?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+        mapOf(
+          "porcentaje" to (if (pct in 0..100) pct else null),
+          "cargando" to (plug != 0)
+        )
+      } catch (e: Exception) {
+        mapOf("porcentaje" to null, "cargando" to false)
+      }
     }
 
     /**

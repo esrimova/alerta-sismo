@@ -18,8 +18,9 @@ import { actualizarUbicacion, cargarUbicacionGuardada } from '../services/locati
 import {
   cargarConfigEmergencia, guardarConfigEmergencia, cargarEstadoEmergencia,
   confirmarEstoyBien, pedirPermisosBluetooth,
-  estadoBluetooth, activarProtocolo,
+  estadoBluetooth, activarProtocolo, textoDeBaliza,
 } from '../services/emergencia';
+import { componerFicha, fichaTieneContenido, balizaPorDefecto, MAX_BALIZA } from '../services/ficha';
 import { puedePantallaCompleta, abrirAjustesPantallaCompleta } from '../../modules/emergencia';
 import {
   disponibilidad as sensorDisponibilidad, medirPrueba, detener as detenerSensor,
@@ -135,6 +136,32 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
     await guardarConfigEmergencia(nueva);
   };
 
+  const actualizarFicha = async (campo, valor) => {
+    const nueva = { ...emerg, ficha: { ...(emerg.ficha || {}), [campo]: valor } };
+    setEmerg(nueva);
+    await guardarConfigEmergencia(nueva);
+  };
+
+  /**
+   * Muestra el mensaje exacto que recibirá quien te encuentre.
+   *
+   * Es la única forma de que el usuario compruebe qué está a punto de compartir
+   * de su historia clínica. Sin verlo, estaría confiando a ciegas en una app que
+   * va a repartir sus datos médicos a desconocidos.
+   */
+  const verFicha = () => {
+    if (!fichaTieneContenido(emerg)) {
+      Alert.alert(
+        'La ficha está vacía',
+        'No has llenado ningún campo, así que quien te encuentre solo recibiría el aviso genérico. Llena al menos el apartamento y el tipo de sangre.'
+      );
+      return;
+    }
+    // Se simula "activado justo ahora" para que se vea la sección de situación.
+    const simulado = { activadaEn: Date.now() };
+    Alert.alert('Así lo recibirá', componerFicha(emerg, simulado, ubicacion));
+  };
+
   const alternarProtocolo = async (valor) => {
     if (valor) {
       // El permiso se pide AL ACTIVAR, no en plena emergencia: si el usuario
@@ -169,7 +196,7 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
     }
     Alert.alert(
       'Probar protocolo',
-      `Se activará la baliza Bluetooth con el nombre "SOS ${emerg.miNombre} ${emerg.contactoTelefono}".\n\nBusca ese nombre en el Bluetooth de otro teléfono.`,
+      `Se activará la baliza Bluetooth con el nombre "${textoDeBaliza(emerg)}".\n\nBusca ese nombre en la lista de Bluetooth de otro teléfono: aparece sin emparejar y sin instalar nada.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -276,6 +303,107 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
     }
   };
 
+  /**
+   * Editor del texto de la baliza.
+   *
+   * El contador de caracteres no es un adorno: son 26 y el usuario no tiene por
+   * qué saberlo. Sin verlo en vivo escribiría un texto que Android recorta en
+   * silencio, y se enteraría en plena emergencia. Por eso se muestra siempre la
+   * vista previa de lo que REALMENTE se va a emitir.
+   */
+  const renderBaliza = () => {
+    const efectivo = textoDeBaliza(emerg);
+    const escrito = (emerg.textoBaliza || '').trim();
+    const seRecorta = escrito.length > MAX_BALIZA;
+
+    return (
+      <View style={styles.subBloque}>
+        <Text style={styles.label}>Texto de la baliza</Text>
+        <TextInput
+          style={styles.input}
+          value={emerg.textoBaliza}
+          onChangeText={(v) => actualizarEmerg('textoBaliza', v)}
+          placeholder={balizaPorDefecto(emerg) || 'SOS Esteban ap715 bitchat'}
+          placeholderTextColor="#64748B"
+        />
+
+        <View style={styles.estadoFila}>
+          <Text style={styles.estadoEtiqueta}>Caracteres</Text>
+          <Text style={[
+            styles.estadoValor,
+            { fontWeight: '800', color: seRecorta ? '#EF4444' : '#22C55E' },
+          ]}>
+            {escrito.length} de {MAX_BALIZA}
+          </Text>
+        </View>
+
+        <View style={styles.estadoFila}>
+          <Text style={styles.estadoEtiqueta}>Se verá como</Text>
+          <Text style={[styles.estadoValor, { fontWeight: '800' }]}>{efectivo}</Text>
+        </View>
+
+        <Text style={styles.endpointTexto}>
+          {seRecorta
+            ? 'Tu texto no cabe y se recortará. El anuncio Bluetooth son 31 bytes y solo caben 26 caracteres.'
+            : 'Déjalo vacío y se arma solo con tu nombre y tu apartamento. Escribe uno propio si sueles estar fuera de casa: "apartamento 715" no dice nada si te pasa algo en la calle.'}
+        </Text>
+      </View>
+    );
+  };
+
+  /**
+   * Ficha de triaje.
+   *
+   * Todo es opcional: se envía lo que haya. Un campo vacío se omite del mensaje
+   * en vez de ir en blanco, porque "Alergias:" sin nada detrás es ambiguo —¿no
+   * tiene, o no lo sabemos?— y en un triaje esa ambigüedad es peligrosa.
+   */
+  const renderFicha = () => {
+    const f = emerg.ficha || {};
+    const campo = (clave, etiqueta, marcador, opciones = {}) => (
+      <>
+        <Text style={styles.label}>{etiqueta}</Text>
+        <TextInput
+          style={[styles.input, opciones.alto && { height: 80, textAlignVertical: 'top' }]}
+          value={f[clave] || ''}
+          onChangeText={(v) => actualizarFicha(clave, v)}
+          placeholder={marcador}
+          placeholderTextColor="#64748B"
+          multiline={!!opciones.alto}
+          keyboardType={opciones.numerico ? 'numeric' : 'default'}
+        />
+      </>
+    );
+
+    return (
+      <View style={styles.subBloque}>
+        <Text style={[styles.cardTitle, { fontSize: 15, marginBottom: 6, color: '#F97316' }]}>
+          Ficha para quien te encuentre
+        </Text>
+        <Text style={[styles.endpointTexto, { marginBottom: 14 }]}>
+          Esto se envía solo, por la malla, a quien te encuentre mientras el protocolo esté
+          activo. Nunca se envía fuera de emergencia. Todo es opcional.
+        </Text>
+
+        {campo('apartamento', 'Apartamento', '715')}
+        {campo('piso', 'Piso', '7')}
+        {campo('referencia', 'Referencia del lugar', 'Torre 3, frente al parque')}
+        {campo('edad', 'Edad', '38', { numerico: true })}
+        {campo('tipoSangre', 'Tipo de sangre', 'O+')}
+        {campo('alergias', 'Alergias', 'Penicilina')}
+        {campo('medicamentos', 'Medicamentos de los que dependo', 'Losartán 50mg')}
+        {campo('notas', 'Otra cosa que deban saber', 'Uso audífono. Hablo español e inglés.', { alto: true })}
+
+        <TouchableOpacity
+          style={[styles.simButton, { backgroundColor: '#334155' }]}
+          onPress={verFicha}
+        >
+          <Text style={styles.buttonText}>Ver el mensaje que se enviará</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   const renderEmergencia = () => {
     if (!emerg) return null;
     const esperando = estadoEmerg?.esperandoConfirmacion;
@@ -340,6 +468,8 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
               onChangeText={(v) => actualizarEmerg('minutosEspera', parseInt(v, 10) || 60)}
             />
 
+            {renderFicha()}
+
             <View style={styles.row}>
               <Checkbox value={emerg.usarBluetooth} onValueChange={(v) => actualizarEmerg('usarBluetooth', v)} />
               <Text style={[styles.checkboxLabel, { width: 'auto', flex: 1 }]}>Baliza Bluetooth</Text>
@@ -348,6 +478,8 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
               <Checkbox value={emerg.usarSonido} onValueChange={(v) => actualizarEmerg('usarSonido', v)} />
               <Text style={[styles.checkboxLabel, { width: 'auto', flex: 1 }]}>Baliza sonora</Text>
             </View>
+
+            {emerg.usarBluetooth && renderBaliza()}
 
             <Text style={styles.endpointTexto}>
               El Bluetooth debe estar encendido: Android prohíbe que una app lo encienda.
@@ -919,6 +1051,13 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 50
+  },
+  subBloque: {
+    marginTop: 8,
+    marginBottom: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
   },
   fuentesBloque: {
     marginTop: 16,

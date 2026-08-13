@@ -24,6 +24,7 @@ import * as Notifications from 'expo-notifications';
 import { iniciarBaliza, detenerBaliza, estadoBluetooth } from '../../modules/emergencia';
 import { SOUND_URLS } from './alert';
 import { registrarEvento, TIPO } from './bitacora';
+import { FICHA_DEFECTO, balizaPorDefecto, recortarBaliza } from './ficha';
 
 const CONFIG_KEY = 'alerta_sismo_emergencia_v1';
 const ESTADO_KEY = 'alerta_sismo_emergencia_estado_v1';
@@ -34,10 +35,18 @@ export const CONFIG_DEFECTO = {
   activo: false,
   miNombre: '',
   contactoNombre: '',
-  contactoTelefono: '',   // el que se muestra en la baliza Bluetooth
+  contactoTelefono: '',
   minutosEspera: MINUTOS_ESPERA_DEFECTO,
   usarBluetooth: true,
   usarSonido: true,
+  /**
+   * Texto de la baliza. Vacio = se genera solo a partir del nombre y el
+   * apartamento. Es editable porque el texto util depende de donde estes: en
+   * casa manda el apartamento, fuera de casa no significa nada.
+   */
+  textoBaliza: '',
+  /** Ficha de triaje. Ver src/services/ficha.js. */
+  ficha: { ...FICHA_DEFECTO },
 };
 
 /**
@@ -51,6 +60,10 @@ function sanear(guardada) {
   for (const clave of Object.keys(CONFIG_DEFECTO)) {
     if (guardada[clave] !== undefined) limpia[clave] = guardada[clave];
   }
+  // La ficha se fusiona campo a campo, no en bloque: copiarla entera dejaria
+  // sin valor por defecto a cualquier campo añadido despues, y ese campo
+  // llegaria como undefined justo al componer el mensaje de emergencia.
+  limpia.ficha = { ...FICHA_DEFECTO, ...(guardada.ficha || {}) };
   return limpia;
 }
 
@@ -196,6 +209,18 @@ export async function pedirPermisosBluetooth() {
 }
 
 /**
+ * El texto que va a emitir la baliza.
+ *
+ * Si el usuario escribio uno propio, manda ese: el texto util depende de donde
+ * este, y "apartamento 715" no significa nada si le pasa algo en la calle.
+ * Si no, se genera a partir del nombre y el apartamento.
+ */
+export function textoDeBaliza(cfg) {
+  const propio = (cfg?.textoBaliza || '').trim();
+  return propio ? recortarBaliza(propio) : balizaPorDefecto(cfg);
+}
+
+/**
  * Vencio el plazo sin confirmacion. Activa todo lo configurado.
  * Cada mecanismo se ejecuta por separado: que falle uno no impide los otros.
  */
@@ -204,11 +229,13 @@ export async function activarProtocolo() {
   const estado = await cargarEstadoEmergencia();
   const resultado = { bluetooth: null, sonido: false };
 
-  if (cfg.usarBluetooth && cfg.contactoTelefono) {
+  if (cfg.usarBluetooth) {
     try {
-      // Corto a proposito: son 31 bytes de paquete BLE. El telefono es el del
-      // CONTACTO, no el del afectado: a quien esta inconsciente no se le llama.
-      resultado.bluetooth = iniciarBaliza(`SOS ${cfg.miNombre} ${cfg.contactoTelefono}`.trim());
+      // La baliza ya NO lleva telefono. Si la red celular funciona, el afectado
+      // habria podido pedir ayuda el mismo; si no funciona, un numero es
+      // inutil. Con esos 26 caracteres se gana mas diciendo DONDE estas y por
+      // que canal se sabe el resto.
+      resultado.bluetooth = iniciarBaliza(textoDeBaliza(cfg));
     } catch (e) {
       resultado.bluetooth = { ok: false, motivo: 'excepcion' };
     }
