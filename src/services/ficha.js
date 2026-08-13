@@ -25,31 +25,93 @@
 // Quien llame a estas funciones tiene que haberlo verificado antes.
 
 import { nivelBateria } from '../../modules/emergencia';
+import { getDistanceFromLatLonInKm } from '../utils/haversine';
 
-/** Campos de la ficha. Todos opcionales: se envía lo que haya. */
+/**
+ * Dos bloques de texto libre, no un formulario de ocho campos.
+ *
+ * Van separados por una razón concreta y no por estética: el bloque de casa
+ * SOLO se envía si el teléfono cree que estás en casa. Si fuera un único bloque
+ * no habría forma de mandar tus datos médicos sin mandar también tu dirección.
+ */
 export const FICHA_DEFECTO = {
-  edad: '',
-  tipoSangre: '',
-  alergias: '',
-  medicamentos: '',
-  piso: '',
-  apartamento: '',
-  /** Referencia para quien no conoce la dirección: "Torre 3, frente al parque". */
-  referencia: '',
-  /** Cualquier cosa que no encaje arriba: condiciones, prótesis, idioma. */
-  notas: '',
+  /** Edad, sangre, alergias, medicamentos, lo que sea. Texto libre. */
+  medicos: '',
+  /** Apartamento, piso, referencia. Solo sale si estás allí. */
+  casa: '',
+  /** Coordenadas de casa, para decidir si estás en ella. */
+  casaLat: null,
+  casaLon: null,
 };
 
 /** Límite del anuncio BLE: 31 bytes de paquete, y el nombre es lo único que cabe. */
 export const MAX_BALIZA = 26;
 
 /**
+ * Radio para dar por buena la cercanía a casa.
+ *
+ * 1,5 km parece enorme para "estoy en mi apartamento", y lo es. No es un radio
+ * de precisión sino un umbral de DESCARTE, y está calibrado sobre lo que el
+ * permiso permite: la app usa ACCESS_COARSE_LOCATION con precisión mínima, que
+ * ubica en el orden de kilómetros. Con FINE se podría afinar, pero ese permiso
+ * está bloqueado a propósito.
+ *
+ * La asimetría es lo que hace útil el umbral: a 20 km es CIERTO que no estás en
+ * casa, y ese es el error peligroso —mandar a un rescatista a tu edificio
+ * cuando estás en la calle—. Dentro del radio solo es probable, y por eso el
+ * mensaje nunca lo afirma como un hecho.
+ */
+export const RADIO_CASA_KM = 1.5;
+
+/**
+ * A partir de cuántas horas la ubicación guardada deja de ser fiable.
+ *
+ * La app solo lee el GPS con la aplicación abierta, como mucho cada 12 horas:
+ * pedir ubicación en segundo plano exigiría un permiso mucho más intrusivo. La
+ * consecuencia es real y hay que asumirla: si sales de casa y no abres la app,
+ * el teléfono sigue creyendo que estás allí.
+ */
+export const FRESCURA_MAX_H = 12;
+
+/**
+ * ¿Está el usuario en su casa?
+ *
+ * Devuelve `true`, `false` o `null` cuando no se puede saber. El null no es un
+ * detalle: es la diferencia entre callar una dirección y afirmarla en falso.
+ */
+export function evaluarSiEstaEnCasa(cfg, ubicacion) {
+  const f = { ...FICHA_DEFECTO, ...(cfg?.ficha || {}) };
+
+  if (f.casaLat == null || f.casaLon == null) {
+    return { enCasa: null, motivo: 'sin_casa_marcada', distanciaKm: null };
+  }
+  if (!ubicacion || ubicacion.lat == null) {
+    return { enCasa: null, motivo: 'sin_ubicacion', distanciaKm: null };
+  }
+
+  const distanciaKm = getDistanceFromLatLonInKm(
+    f.casaLat, f.casaLon, ubicacion.lat, ubicacion.lon
+  );
+
+  const horas = ubicacion.at ? (Date.now() - ubicacion.at) / 3600000 : Infinity;
+
+  // Lejos es lejos aunque el dato sea viejo: si hace diez horas estabas a 40 km,
+  // afirmar tu dirección de casa sigue siendo temerario.
+  if (distanciaKm > RADIO_CASA_KM) {
+    return { enCasa: false, motivo: 'lejos', distanciaKm };
+  }
+  if (horas > FRESCURA_MAX_H) {
+    return { enCasa: null, motivo: 'ubicacion_vieja', distanciaKm };
+  }
+  return { enCasa: true, motivo: 'cerca', distanciaKm };
+}
+
+/**
  * Texto por defecto de la baliza.
  *
  * Lleva a la vez el APARTAMENTO y el puntero al canal, que es la tensión real
  * de estos 26 caracteres: el apartamento es lo accionable para quien está
- * parado en el edificio, y "bitchat" es lo que lleva a todo lo demás. Se
- * abrevian los dos antes que soltar uno.
+ * parado en el edificio, y "bitchat" es lo que lleva a todo lo demás.
  *
  * El teléfono se retiró de la baliza a propósito: si la red celular funciona,
  * el afectado habría podido pedir ayuda él mismo; si no funciona, un número no
@@ -57,12 +119,25 @@ export const MAX_BALIZA = 26;
  */
 export function balizaPorDefecto(cfg) {
   const nombre = (cfg?.miNombre || '').trim().split(/\s+/)[0] || '';
-  const apto = (cfg?.ficha?.apartamento || '').trim();
   const partes = ['SOS'];
   if (nombre) partes.push(nombre);
-  if (apto) partes.push(`ap${apto}`);
+  const apto = primeraSeña(cfg?.ficha?.casa);
+  if (apto) partes.push(apto);
   partes.push('bitchat');
   return recortarBaliza(partes.join(' '));
+}
+
+/**
+ * Saca una seña corta del bloque de casa para meterla en los 26 caracteres.
+ * Busca un número de apartamento; si no lo encuentra, no inventa nada.
+ */
+function primeraSeña(textoCasa) {
+  const t = (textoCasa || '').trim();
+  if (!t) return null;
+  const m = t.match(/(?:apto|apartamento|apt|casa)\.?\s*#?\s*(\w{1,5})/i);
+  if (m) return `ap${m[1]}`;
+  const soloNumero = t.match(/\b(\d{2,5})\b/);
+  return soloNumero ? `ap${soloNumero[1]}` : null;
 }
 
 /** Recorta al límite del anuncio, sin cortar a mitad de palabra si se puede. */
@@ -94,25 +169,19 @@ function haceCuanto(ms) {
  * Compone el mensaje que se envía por la malla.
  *
  * Va en secciones cortas y encabezados en mayúscula porque quien lo lee lo hace
- * con prisa, probablemente de pie y en malas condiciones. Un párrafo corrido
- * obligaría a leerlo entero para encontrar el tipo de sangre.
+ * con prisa, probablemente de pie y en malas condiciones.
  *
- * Los campos vacíos se OMITEN en vez de mostrarse en blanco: una línea que dice
- * "Alergias:" sin nada detrás es ambigua —¿no tiene, o no lo sabemos?— y en un
- * triaje esa ambigüedad es peligrosa.
- *
- * @param cfg configuración de emergencia, con la ficha dentro
- * @param estado estado del protocolo, para saber desde cuándo está activo
- * @param ubicacion última ubicación conocida, si el usuario la tiene activada
+ * LA DIRECCIÓN DE CASA SOLO SALE SI EL TELÉFONO CREE QUE ESTÁS EN ELLA. Mandar
+ * "apartamento 715" cuando estás en la calle no es información incompleta: es
+ * información falsa, y manda a quien te busca al lugar equivocado. Cuando no se
+ * puede saber, se dice que no se pudo saber en vez de elegir por el usuario.
  */
 export function componerFicha(cfg, estado, ubicacion = null) {
   const f = { ...FICHA_DEFECTO, ...(cfg?.ficha || {}) };
   const nombre = (cfg?.miNombre || '').trim();
   const bloques = [];
 
-  bloques.push(
-    '⚠️ MENSAJE AUTOMÁTICO — no lo escribió una persona.'
-  );
+  bloques.push('⚠️ MENSAJE AUTOMÁTICO — no lo escribió una persona.');
 
   const quien = nombre ? `Soy ${nombre}.` : 'Soy el dueño de este teléfono.';
   bloques.push(
@@ -121,24 +190,39 @@ export function componerFicha(cfg, estado, ubicacion = null) {
   );
 
   // DÓNDE ESTOY va primero: es lo que decide si quien lee puede hacer algo.
+  const casa = evaluarSiEstaEnCasa(cfg, ubicacion);
   const donde = [];
-  if (f.apartamento) donde.push(`Apartamento ${f.apartamento}`);
-  if (f.piso) donde.push(`Piso ${f.piso}`);
-  if (f.referencia) donde.push(f.referencia);
-  if (ubicacion?.lat != null) {
-    donde.push(`Coordenadas aproximadas: ${ubicacion.lat.toFixed(4)}, ${ubicacion.lon.toFixed(4)}`);
+
+  if (f.casa && casa.enCasa === true) {
+    donde.push(f.casa);
+  } else if (f.casa && casa.enCasa === null) {
+    // Se ofrece, pero marcada como no confirmada. Ocultarla del todo perdería
+    // el único dato de dirección que existe; afirmarla sería mentir.
+    donde.push(`No pude confirmar dónde estoy. Si no me he movido, vivo en: ${f.casa}`);
+  } else if (casa.enCasa === false) {
+    donde.push('NO estoy en mi casa. Mi dirección habitual no sirve para buscarme.');
   }
+
+  if (ubicacion?.lat != null) {
+    const edadH = ubicacion.at ? (Date.now() - ubicacion.at) / 3600000 : null;
+    const cuando = edadH != null && edadH > 1
+      ? ` (leída hace ${Math.round(edadH)} h)`
+      : '';
+    donde.push(
+      `Ubicación aproximada: ${ubicacion.lat.toFixed(4)}, ${ubicacion.lon.toFixed(4)}${cuando}` +
+      (ubicacion.etiqueta ? ` — ${ubicacion.etiqueta}` : '')
+    );
+  } else {
+    donde.push('Mi teléfono no tiene una ubicación reciente.');
+  }
+
   // Recordatorio del alcance: si te llegó esto por Bluetooth, está cerca.
   donde.push('Si recibes esto por la malla, estoy a pocos metros o a pocos saltos.');
   bloques.push(`DÓNDE ESTOY\n${donde.join('\n')}`);
 
-  const medicos = [];
-  if (f.edad) medicos.push(`Edad: ${f.edad}`);
-  if (f.tipoSangre) medicos.push(`Tipo de sangre: ${f.tipoSangre}`);
-  if (f.alergias) medicos.push(`Alergias: ${f.alergias}`);
-  if (f.medicamentos) medicos.push(`Medicamentos de los que dependo: ${f.medicamentos}`);
-  if (f.notas) medicos.push(f.notas);
-  if (medicos.length) bloques.push(`DATOS MÉDICOS\n${medicos.join('\n')}`);
+  if (f.medicos.trim()) {
+    bloques.push(`DATOS MÉDICOS\n${f.medicos.trim()}`);
+  }
 
   // Los dos datos que no están en ninguna otra parte.
   const situacion = [];
@@ -178,5 +262,5 @@ export function componerFicha(cfg, estado, ubicacion = null) {
  */
 export function fichaTieneContenido(cfg) {
   const f = { ...FICHA_DEFECTO, ...(cfg?.ficha || {}) };
-  return Object.values(f).some((v) => String(v || '').trim() !== '');
+  return Boolean(f.medicos.trim() || f.casa.trim());
 }

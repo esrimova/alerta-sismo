@@ -60,10 +60,16 @@ function sanear(guardada) {
   for (const clave of Object.keys(CONFIG_DEFECTO)) {
     if (guardada[clave] !== undefined) limpia[clave] = guardada[clave];
   }
-  // La ficha se fusiona campo a campo, no en bloque: copiarla entera dejaria
-  // sin valor por defecto a cualquier campo añadido despues, y ese campo
-  // llegaria como undefined justo al componer el mensaje de emergencia.
-  limpia.ficha = { ...FICHA_DEFECTO, ...(guardada.ficha || {}) };
+  // La ficha se fusiona campo a campo y descartando claves desconocidas, por el
+  // mismo motivo que el resto: copiarla entera dejaria sin valor por defecto a
+  // cualquier campo nuevo —que llegaria como undefined justo al componer el
+  // mensaje de emergencia— y arrastraria para siempre los campos del formulario
+  // largo que se sustituyo por dos bloques de texto.
+  const fichaGuardada = guardada.ficha || {};
+  limpia.ficha = { ...FICHA_DEFECTO };
+  for (const clave of Object.keys(FICHA_DEFECTO)) {
+    if (fichaGuardada[clave] !== undefined) limpia.ficha[clave] = fichaGuardada[clave];
+  }
   return limpia;
 }
 

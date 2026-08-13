@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, TextInput, ActivityIndicator, Alert, ScrollView, AppState } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, TextInput, ActivityIndicator, Alert, ScrollView, AppState, Modal } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import Checkbox from 'expo-checkbox';
 import { COLOMBIA_CITIES } from '../utils/colombia';
@@ -20,7 +20,9 @@ import {
   confirmarEstoyBien, pedirPermisosBluetooth,
   estadoBluetooth, activarProtocolo, textoDeBaliza,
 } from '../services/emergencia';
-import { componerFicha, fichaTieneContenido, balizaPorDefecto, MAX_BALIZA } from '../services/ficha';
+import {
+  componerFicha, fichaTieneContenido, balizaPorDefecto, MAX_BALIZA, evaluarSiEstaEnCasa,
+} from '../services/ficha';
 import { puedePantallaCompleta, abrirAjustesPantallaCompleta } from '../../modules/emergencia';
 import {
   disponibilidad as sensorDisponibilidad, medirPrueba, detener as detenerSensor,
@@ -62,6 +64,7 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
   const [medicion, setMedicion] = useState(null);
   const [midiendo, setMidiendo] = useState(0);
   const [escucha, setEscucha] = useState(null);
+  const [fichaAbierta, setFichaAbierta] = useState(false);
 
   useEffect(() => {
     initSettings();
@@ -140,6 +143,41 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
     const nueva = { ...emerg, ficha: { ...(emerg.ficha || {}), [campo]: valor } };
     setEmerg(nueva);
     await guardarConfigEmergencia(nueva);
+  };
+
+  /**
+   * Guarda dónde queda la casa, leyendo el GPS ahora mismo.
+   *
+   * Se pide en un momento tranquilo y a propósito: durante una emergencia el
+   * usuario puede estar inconsciente, y no hay quien conteste un diálogo.
+   */
+  const marcarCasaAqui = async () => {
+    setUbicando(true);
+    try {
+      const r = await actualizarUbicacion(true);
+      if (!r.ok || !r.ubicacion) {
+        Alert.alert(
+          'No se pudo leer el GPS',
+          r.motivo === 'permiso_denegado'
+            ? 'Hace falta el permiso de ubicación para marcar dónde queda tu casa.'
+            : 'Inténtalo cerca de una ventana o al aire libre.'
+        );
+        return;
+      }
+      setUbicacion(r.ubicacion);
+      const nueva = {
+        ...emerg,
+        ficha: { ...(emerg.ficha || {}), casaLat: r.ubicacion.lat, casaLon: r.ubicacion.lon },
+      };
+      setEmerg(nueva);
+      await guardarConfigEmergencia(nueva);
+      Alert.alert(
+        'Casa marcada',
+        'A partir de ahora tu dirección solo se enviará cuando el teléfono crea que estás cerca de aquí.'
+      );
+    } finally {
+      setUbicando(false);
+    }
   };
 
   /**
@@ -352,55 +390,159 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
   };
 
   /**
-   * Ficha de triaje.
+   * Resumen de la ficha en la tarjeta. El detalle vive en un modal.
    *
-   * Todo es opcional: se envía lo que haya. Un campo vacío se omite del mensaje
-   * en vez de ir en blanco, porque "Alergias:" sin nada detrás es ambiguo —¿no
-   * tiene, o no lo sabemos?— y en un triaje esa ambigüedad es peligrosa.
+   * Ocho campos en línea alargaban la pantalla de configuración hasta hacerla
+   * incómoda, y esto se llena una vez en la vida. Aquí solo queda el estado.
    */
   const renderFicha = () => {
     const f = emerg.ficha || {};
-    const campo = (clave, etiqueta, marcador, opciones = {}) => (
-      <>
-        <Text style={styles.label}>{etiqueta}</Text>
-        <TextInput
-          style={[styles.input, opciones.alto && { height: 80, textAlignVertical: 'top' }]}
-          value={f[clave] || ''}
-          onChangeText={(v) => actualizarFicha(clave, v)}
-          placeholder={marcador}
-          placeholderTextColor="#64748B"
-          multiline={!!opciones.alto}
-          keyboardType={opciones.numerico ? 'numeric' : 'default'}
-        />
-      </>
-    );
+    const lleno = fichaTieneContenido(emerg);
+    const casaMarcada = f.casaLat != null;
 
     return (
       <View style={styles.subBloque}>
-        <Text style={[styles.cardTitle, { fontSize: 15, marginBottom: 6, color: '#F97316' }]}>
-          Ficha para quien te encuentre
-        </Text>
-        <Text style={[styles.endpointTexto, { marginBottom: 14 }]}>
-          Esto se envía solo, por la malla, a quien te encuentre mientras el protocolo esté
-          activo. Nunca se envía fuera de emergencia. Todo es opcional.
-        </Text>
+        <View style={styles.estadoFila}>
+          <Text style={styles.estadoEtiqueta}>Ficha para quien te encuentre</Text>
+          <Text style={[
+            styles.estadoValor,
+            { fontWeight: '800', color: lleno ? '#22C55E' : '#F59E0B' },
+          ]}>
+            {lleno ? 'LISTA' : 'VACÍA'}
+          </Text>
+        </View>
 
-        {campo('apartamento', 'Apartamento', '715')}
-        {campo('piso', 'Piso', '7')}
-        {campo('referencia', 'Referencia del lugar', 'Torre 3, frente al parque')}
-        {campo('edad', 'Edad', '38', { numerico: true })}
-        {campo('tipoSangre', 'Tipo de sangre', 'O+')}
-        {campo('alergias', 'Alergias', 'Penicilina')}
-        {campo('medicamentos', 'Medicamentos de los que dependo', 'Losartán 50mg')}
-        {campo('notas', 'Otra cosa que deban saber', 'Uso audífono. Hablo español e inglés.', { alto: true })}
+        {lleno && (
+          <View style={styles.estadoFila}>
+            <Text style={styles.estadoEtiqueta}>Dirección de casa</Text>
+            <Text style={[
+              styles.estadoValor,
+              { color: casaMarcada ? '#E2E8F0' : '#F59E0B' },
+            ]}>
+              {!f.casa.trim()
+                ? 'sin escribir'
+                : (casaMarcada ? 'solo se envía si estás allí' : 'falta marcar dónde queda')}
+            </Text>
+          </View>
+        )}
 
         <TouchableOpacity
-          style={[styles.simButton, { backgroundColor: '#334155' }]}
-          onPress={verFicha}
+          style={[styles.simButton, { backgroundColor: '#F97316' }]}
+          onPress={() => setFichaAbierta(true)}
         >
-          <Text style={styles.buttonText}>Ver el mensaje que se enviará</Text>
+          <Text style={styles.buttonText}>
+            {lleno ? 'Editar la ficha' : 'Llenar la ficha'}
+          </Text>
         </TouchableOpacity>
       </View>
+    );
+  };
+
+  /**
+   * Modal de la ficha: dos bloques de texto libre, no un formulario.
+   *
+   * Van separados por una razón funcional y no estética: el bloque de casa SOLO
+   * se envía si el teléfono cree que estás allí. En un único bloque no habría
+   * forma de mandar los datos médicos sin mandar también la dirección.
+   */
+  const renderModalFicha = () => {
+    const f = emerg.ficha || {};
+    const casa = evaluarSiEstaEnCasa(emerg, ubicacion);
+
+    return (
+      <Modal
+        visible={fichaAbierta}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setFichaAbierta(false)}
+      >
+        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 60 }}>
+          <Text style={[styles.title, { fontSize: 22, marginTop: 20 }]}>
+            Ficha de emergencia
+          </Text>
+          <Text style={[styles.endpointTexto, { marginBottom: 20 }]}>
+            Esto se envía solo, por la malla, a quien te encuentre mientras el protocolo
+            esté activo. Fuera de emergencia no se envía nunca. Escribe con tus palabras.
+          </Text>
+
+          <Text style={styles.label}>Datos médicos</Text>
+          <TextInput
+            style={[styles.input, { height: 140, textAlignVertical: 'top' }]}
+            multiline
+            value={f.medicos}
+            onChangeText={(v) => actualizarFicha('medicos', v)}
+            placeholder={'38 años, sangre O+.\nAlérgico a la penicilina.\nDependo de losartán 50mg.\nUso audífono en el oído derecho.'}
+            placeholderTextColor="#64748B"
+          />
+
+          <Text style={[styles.label, { marginTop: 20 }]}>Dónde vivo</Text>
+          <TextInput
+            style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+            multiline
+            value={f.casa}
+            onChangeText={(v) => actualizarFicha('casa', v)}
+            placeholder={'Apartamento 715, piso 7.\nTorre 3, frente al parque.'}
+            placeholderTextColor="#64748B"
+          />
+
+          <View style={styles.estadoFila}>
+            <Text style={styles.estadoEtiqueta}>Ubicación de casa</Text>
+            <Text style={[
+              styles.estadoValor,
+              { color: f.casaLat != null ? '#22C55E' : '#F59E0B', fontWeight: '700' },
+            ]}>
+              {f.casaLat != null ? 'MARCADA' : 'SIN MARCAR'}
+            </Text>
+          </View>
+
+          {f.casaLat != null && casa.distanciaKm != null && (
+            <View style={styles.estadoFila}>
+              <Text style={styles.estadoEtiqueta}>Ahora mismo estás</Text>
+              <Text style={styles.estadoValor}>
+                {casa.enCasa === true
+                  ? 'cerca de casa: se enviaría'
+                  : (casa.enCasa === false
+                    ? `a ${Math.round(casa.distanciaKm)} km: no se enviaría`
+                    : 'sin poder confirmar: se enviaría con advertencia')}
+              </Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[styles.simButton, { backgroundColor: '#334155' }]}
+            onPress={marcarCasaAqui}
+            disabled={ubicando}
+          >
+            <Text style={styles.buttonText}>
+              {ubicando ? 'Leyendo GPS…' : 'Estoy en casa ahora, marcar aquí'}
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={styles.endpointTexto}>
+            Sin marcar tu casa, la dirección se envía siempre con una advertencia de que no
+            se pudo confirmar. Con ella marcada, el teléfono la calla cuando estás lejos:
+            mandar "apartamento 715" desde la calle enviaría a quien te busca al lugar
+            equivocado.{'\n\n'}
+            Ojo con la precisión: la app usa ubicación aproximada, de kilómetros, así que
+            solo puede descartar con certeza que estés lejos. Y solo lee el GPS con la app
+            abierta, así que si saliste y no la abriste, sigue creyendo que estás en casa.
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.simButton, { backgroundColor: '#334155' }]}
+            onPress={verFicha}
+          >
+            <Text style={styles.buttonText}>Ver el mensaje que se enviará</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.simButton, { backgroundColor: '#22C55E' }]}
+            onPress={() => setFichaAbierta(false)}
+          >
+            <Text style={styles.buttonText}>Listo</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </Modal>
     );
   };
 
@@ -1018,6 +1160,8 @@ export default function ConfigScreen({ isFlashing, startAlarm, stopAlarm }) {
       {/* Va arriba del todo a proposito: cuando acaba de ocurrir un sismo, esto
           es lo unico que el usuario quiere ver. Se pinta solo si hay algo. */}
       <UltimoEvento />
+
+      {renderModalFicha()}
 
       {renderEmergencia()}
 
