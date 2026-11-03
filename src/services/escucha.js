@@ -17,7 +17,9 @@
 //    usuario, asi que no estan en la notificacion. Para eso esta el USGS, que
 //    llega tarde pero las trae medidas.
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { registrarEvento, TIPO } from './bitacora';
+import { notificarEscuchaPerdida, notificarEscuchaActiva } from './alert';
 
 let nativo = null;
 let motivoAusencia = null;
@@ -54,6 +56,63 @@ export function estadoEscucha() {
       motivo: e?.message || 'error_desconocido',
     };
   }
+}
+
+/** Donde se recuerda si la escucha tenia permiso la ultima vez que se miro. */
+const CLAVE_PERMISO = 'alerta_sismo_escucha_permiso_v1';
+
+/**
+ * Vigila que la escucha de Google no se haya quedado sin permiso.
+ *
+ * Se pierde con mas facilidad de lo que parece: reinstalar la app lo borra
+ * —basta un `adb install` sobre una desinstalacion previa—, y HyperOS lo
+ * revoca por su cuenta al restringir una app. Y se pierde EN SILENCIO: no
+ * falla nada, el monitoreo sigue corriendo y lo unico que cambia es que la app
+ * pasa de enterarse en ~18 s a enterarse en 4-7 minutos. Es la degradacion mas
+ * grave que puede sufrir sin que nada parezca roto.
+ *
+ * Se registra el cambio de estado, no el estado: escribir cada 60 s que sigue
+ * sin permiso llenaria la bitacora y enterraria lo que si importa.
+ *
+ * La memoria va a disco porque el servicio en primer plano muere y revive, y
+ * una variable de modulo volveria a empezar en blanco cada vez, contando como
+ * "perdido" algo que ya se habia contado.
+ */
+export async function vigilarPermisoEscucha() {
+  if (!nativo) return { cambio: null, permiso: false };
+
+  const { permiso } = estadoEscucha();
+
+  let previo = null;
+  try {
+    const guardado = await AsyncStorage.getItem(CLAVE_PERMISO);
+    if (guardado != null) previo = guardado === 'true';
+  } catch (e) {
+    // Sin memoria previa se trata como la primera vuelta: se toma la foto y no
+    // se inventa una transicion que no se puede demostrar.
+  }
+
+  if (previo === permiso) return { cambio: null, permiso };
+
+  try {
+    await AsyncStorage.setItem(CLAVE_PERMISO, permiso ? 'true' : 'false');
+  } catch (e) {
+    console.log('No se pudo guardar el estado del permiso de escucha:', e);
+  }
+
+  // Primera vez que se mira: no hay transicion, solo un punto de partida. Aqui
+  // es donde se evita darle la lata a quien nunca concedio el permiso.
+  if (previo === null) return { cambio: null, permiso };
+
+  if (!permiso) {
+    // Solo notificacion: perder el permiso es un hecho de la app, no de un
+    // sismo, y la bitacora es solo de sismos.
+    await notificarEscuchaPerdida();
+    return { cambio: 'perdido', permiso };
+  }
+
+  await notificarEscuchaActiva();
+  return { cambio: 'activa', permiso };
 }
 
 export function abrirAjustesEscucha() {

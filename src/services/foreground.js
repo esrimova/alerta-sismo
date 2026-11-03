@@ -21,13 +21,23 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ejecutarCiclo } from './monitor';
 import { revisarVencimiento, cargarEstadoEmergencia } from './emergencia';
-import { hayInternet, suscribirRed, enModoAvion } from './red';
+import { hayInternet, suscribirRed } from './red';
 import { marcarSinConexion } from './health';
-import { registrarEvento, TIPO } from './bitacora';
 import { iniciarFusion, mantenimientoFusion } from './fusion';
 import { registrarEspera, olvidarEspera, despertarAhora } from './despertador';
+import { hayModulo, estadoEscucha } from './escucha';
 
 const CANAL_MONITOREO = 'monitoreo-activo';
+
+/**
+ * Id fijo de la notificacion permanente.
+ *
+ * Sin el, cada llamada a displayNotification crearia una notificacion nueva en
+ * vez de actualizar la que ya existe, y la barra de estado acabaria con una
+ * hilera de "Monitoreo activo". Con id fijo, volver a mostrarla la reemplaza.
+ */
+const ID_NOTIFICACION = 'monitoreo-activo';
+
 const INTERVALO_MS = 60000;
 
 /**
@@ -139,12 +149,8 @@ notifee.registerForegroundService(() => {
 
       if (conRed) {
         if (hibernando) {
+          // Volver la red no se anota en la bitacora: no aporta nada y la llena.
           hibernando = false;
-          registrarEvento({
-            tipo: TIPO.RED,
-            subtipo: 'conexion_recuperada',
-            detalle: 'Volvió el internet. El monitoreo se reanuda de inmediato.',
-          });
         }
         try {
           await ejecutarCiclo();
@@ -159,15 +165,8 @@ notifee.registerForegroundService(() => {
         } catch (e) {
           console.log('No se pudo marcar la falta de conexion:', e);
         }
-        const avion = await enModoAvion();
-        registrarEvento({
-          tipo: TIPO.RED,
-          subtipo: 'conexion_perdida',
-          detalle: avion
-            ? 'Sin internet (modo avión activo). El monitoreo hiberna y se reanudará solo al volver la señal.'
-            : 'Sin internet. El monitoreo hiberna y se reanudará solo al volver la señal.',
-          modoAvion: avion,
-        });
+        // Tampoco se anota perder la red: el semaforo del feed ya lo refleja
+        // con marcarSinConexion().
       }
 
       // El temporizador de "Estoy bien" se revisa SIEMPRE, incluso hibernando:
@@ -187,6 +186,16 @@ notifee.registerForegroundService(() => {
         await mantenimientoFusion();
       } catch (e) {
         console.log('Mantenimiento de episodios fallo:', e);
+      }
+
+      // Tambien SIEMPRE: el permiso de escucha se concede y se revoca FUERA de
+      // la app, asi que el unico momento fiable para mirarlo es cada vuelta. Es
+      // ademas lo que corrige la notificacion sola en cuanto el usuario vuelve
+      // de los ajustes, sin tener que reiniciar el monitoreo.
+      try {
+        await reflejarViaRapida();
+      } catch (e) {
+        console.log('No se pudo reflejar el estado de la vía rápida:', e);
       }
 
       // Marca de vida para el vigilante.
@@ -217,26 +226,94 @@ notifee.registerForegroundService(() => {
   });
 });
 
+/**
+ * ¿Esta la app corriendo sin su via rapida?
+ *
+ * Sin el permiso de acceso a notificaciones no se escucha la alerta de Google y
+ * la app pasa de enterarse en ~18 s a enterarse en 4-7 minutos. Si el modulo
+ * nativo no existe no se afirma nada: seria acusar de falta de permiso a un
+ * equipo donde esa via directamente no esta compilada.
+ */
+function faltaLaViaRapida() {
+  if (!hayModulo()) return false;
+  try {
+    return !estadoEscucha().permiso;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Que dice la notificacion permanente.
+ *
+ * Es el unico sitio donde la degradacion se puede contar sin acosar a nadie: la
+ * notificacion ya esta ahi de todas formas, obligada por Android a cambio de no
+ * matar el proceso. Que diga la verdad no cuesta una interrupcion mas.
+ */
+function textoServicio(sinViaRapida) {
+  if (sinViaRapida) {
+    return {
+      title: 'Monitoreo activo, sin alertas de Google',
+      body: 'Falta el acceso a notificaciones: los avisos llegarán en minutos, '
+        + 'no en segundos. Abre la app para concederlo.',
+    };
+  }
+  return {
+    title: 'Monitoreo sísmico activo',
+    body: 'Vigilando eventos cada minuto.',
+  };
+}
+
+async function mostrarNotificacionServicio(sinViaRapida) {
+  const channelId = await crearCanal();
+  await notifee.displayNotification({
+    id: ID_NOTIFICACION,
+    ...textoServicio(sinViaRapida),
+    android: {
+      channelId,
+      asForegroundService: true,
+      // Debe coincidir con el foregroundServiceType del manifiesto, que
+      // añade plugins/withForegroundServiceType.js. Android 14 lo exige.
+      foregroundServiceTypes: [
+        AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+      ],
+      ongoing: true,
+      colorized: false,
+      pressAction: { id: 'default' },
+    },
+  });
+}
+
+/** Ultimo estado reflejado, para no reescribir la notificacion cada minuto. */
+let sinViaRapidaReflejado = null;
+
+/**
+ * Pone al dia la notificacion permanente si la via rapida cambio de estado.
+ *
+ * Esto es lo que cubre el caso que una comprobacion de transicion NO puede
+ * cubrir: al reinstalar la app se borra tambien su memoria, asi que "reinstalada
+ * y sin permiso" es indistinguible de "usuario nuevo que nunca lo concedio". La
+ * app no puede saber que un dia lo tuvo. Lo que si puede es no correr degradada
+ * en silencio, y eso no depende de recordar nada.
+ */
+export async function reflejarViaRapida() {
+  if (Platform.OS !== 'android') return;
+  const sinViaRapida = faltaLaViaRapida();
+  if (sinViaRapida === sinViaRapidaReflejado) return;
+  try {
+    await mostrarNotificacionServicio(sinViaRapida);
+    sinViaRapidaReflejado = sinViaRapida;
+  } catch (e) {
+    console.log('No se pudo actualizar la notificación del servicio:', e);
+  }
+}
+
 export async function iniciarServicioPrimerPlano() {
   if (Platform.OS !== 'android') return false;
   try {
-    const channelId = await crearCanal();
-    await notifee.displayNotification({
-      title: 'Monitoreo sísmico activo',
-      body: 'Vigilando eventos cada minuto.',
-      android: {
-        channelId,
-        asForegroundService: true,
-        // Debe coincidir con el foregroundServiceType del manifiesto, que
-        // añade plugins/withForegroundServiceType.js. Android 14 lo exige.
-        foregroundServiceTypes: [
-          AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
-        ],
-        ongoing: true,
-        colorized: false,
-        pressAction: { id: 'default' },
-      },
-    });
+    const sinViaRapida = faltaLaViaRapida();
+    await mostrarNotificacionServicio(sinViaRapida);
+    sinViaRapidaReflejado = sinViaRapida;
     return true;
   } catch (e) {
     console.log('No se pudo iniciar el servicio en primer plano:', e);

@@ -1,8 +1,9 @@
 // src/services/bitacora.js
 //
-// Registro permanente de todo lo que le pasa a la app durante una emergencia:
-// alertas disparadas, protocolo de emergencia, cortes de red y caidas del
-// servicio.
+// Registro permanente de los sismos y de lo que la app hizo por ellos: episodios
+// (las fuentes de un mismo sismo), alertas disparadas y protocolo de emergencia.
+// NO registra hechos de la app —red, caidas del feed, reinicios—: eso va a
+// notificaciones y al semaforo.
 //
 // Dos reglas de diseño que vienen del requisito, no de la comodidad:
 //
@@ -92,10 +93,19 @@ export function registrarEvento(entrada) {
   });
 }
 
-/** Todas las entradas, de la mas reciente a la mas antigua. */
+/**
+ * Tipos que NO son sismos. La bitacora es solo de sismos y de lo que la app hizo
+ * por ellos; conexion, caidas del feed y reinicios del monitoreo son hechos de
+ * la app y ya no se escriben. Siguen ocultos aqui porque entradas antiguas de
+ * esos tipos pueden estar guardadas, y esas no se borran: lo unico que borra es
+ * el usuario.
+ */
+const TIPOS_DE_LA_APP = new Set(['red', 'servicio', 'sistema']);
+
+/** Las entradas de sismos, de la mas reciente a la mas antigua. */
 export async function cargarBitacora() {
   const datos = await leerCrudo();
-  return datos.slice().reverse();
+  return datos.filter((e) => !TIPOS_DE_LA_APP.has(e.tipo)).reverse();
 }
 
 export async function contarBitacora() {

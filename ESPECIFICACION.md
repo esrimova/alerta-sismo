@@ -57,9 +57,11 @@ La app organiza toda emergencia en tres fases. **Las fases son lo invariante; el
 | Consulta al feed del USGS cada 60 s mediante servicio en primer plano | **construido** |
 | Hibernación sin internet y reanudación inmediata al volver la señal | **construido** |
 | Vigilante que revive el monitoreo si el sistema operativo lo mata | **construido** |
-| Bitácora permanente de alertas, protocolo, red y servicio | **construido** |
+| Bitácora permanente **solo de sismos**: episodios, alertas y protocolo. Los hechos de la app (red, caída del feed, reinicios) van a notificaciones y al semáforo, no a la bitácora | **construido** |
 | Semáforo de estado del feed, distinguiendo "sin internet" de "servicio caído" | **construido** |
 | Escucha de la alerta de Google mediante sus canales de notificación | **construido** |
+| La notificación permanente avisa si falta el permiso de la escucha de Google | **construido** |
+| Aviso y registro cuando ese permiso se pierde habiéndolo tenido | **construido** |
 | Semáforo por fuente: feed, sensor y alerta de Google, cada uno con su estado | **construido** |
 | Episodio sísmico: las tres fuentes del mismo sismo en un solo registro | **construido** |
 | Medida del aviso previo real, cruzando la hora de Google con la llegada de la onda | **construido** |
@@ -85,14 +87,19 @@ compararlos.
 |---|---|---|---|
 | Alerta de Google | ~18 s | Aviso rápido y nivel esperado | Google se equivoca (§5, Turquía 2023) o no hay red |
 | Acelerómetro propio | 23-58 s | Lo que ocurrió en la dirección exacta del usuario | El teléfono va en movimiento |
-| Feed del USGS | 4-7 min | Magnitud revisada, profundidad, coordenadas | El servicio cae o no hay internet |
+| Feed del USGS | 4-7 min en el mundo; **~19 min la versión revisada en Colombia** | Magnitud revisada, profundidad, coordenadas | El servicio cae o no hay internet |
 
 **El USGS no se degrada por llegar tarde: cambia de papel.** Deja de ser el disparador
 para ser el **registro autoritativo**, que es lo que hace falta si hay catástrofe y
 alguien necesita los datos del evento.
 
 El episodio **se abre con la primera fuente que llegue**, sea cual sea; esperar al USGS
-para abrirlo sería esperar los 4-7 minutos que esta capa existe para evitar. Las fuentes
+para abrirlo sería esperar los minutos que esta capa existe para evitar. **Ninguna fuente
+pisa a otra, ni a sí misma:** cada una guarda todas sus observaciones en orden (la alerta
+de Google y su actualización posterior; la versión automática del USGS y la revisada) y la
+primera es la que mide la rapidez. El USGS se suma al episodio aunque ninguna regla lo
+considere alerta, solo para registrarlo: no suena ni abre protocolo. El episodio espera
+45 minutos para alcanzar la revisión del USGS. Las fuentes
 se reconocen como el mismo sismo comparando la **hora de origen estimada** —cada una
 resta su propia latencia— con un margen de 120 s. Cuando llega el USGS, que trae la hora
 medida, todos los desfases se recalculan contra ella y dejan de ser aproximaciones.
@@ -152,6 +159,37 @@ Canales de `com.google.android.gms`, grupo `Personal_Safety_Id`:
 Si aparece un canal desconocido en un paquete vigilado, se registra y se avisa: es la señal de que Google cambió el formato.
 
 Requisitos y límites de esta vía: exige el permiso de acceso a notificaciones, que es amplio (lee **todas** las notificaciones del teléfono); Android 14+ no vincula el servicio hasta el primer desbloqueo tras reiniciar; y requiere que el proceso de la app esté vivo, cosa que el servicio en primer plano ya garantiza mientras el monitoreo esté activo.
+
+**Ese permiso se cae solo, y en silencio.** Reinstalar la app lo borra, y HyperOS
+lo revoca por su cuenta al restringir una app. Cuando se pierde no falla nada:
+el monitoreo sigue corriendo, ningún servicio se cae y lo único que cambia es
+que la app pasa de enterarse en ~18 s a enterarse en minutos. Es la peor
+degradación posible precisamente porque nada parece roto.
+
+**La app no puede recuperarlo por su cuenta, y ninguna puede.**
+`BIND_NOTIFICATION_LISTENER_SERVICE` no tiene solicitud en tiempo de ejecución:
+se concede a mano en una pantalla del sistema y no hay diálogo que pedir. Todo
+lo que cabe hacer es detectarlo, decirlo y llevar al usuario a esa pantalla.
+
+Se hace de dos maneras, porque una sola no alcanza:
+
+- **La notificación permanente dice si falta.** Mientras el monitoreo corre,
+  Android obliga a tener una notificación en la barra a cambio de no matar el
+  proceso; que además diga la verdad no cuesta ninguna interrupción extra. Sin
+  permiso pasa a *"Monitoreo activo, sin alertas de Google"*. Es lo único que
+  cubre **el caso de la reinstalación**: al borrarse la app se borra también su
+  memoria, así que "recién reinstalada y sin permiso" es indistinguible de
+  "usuario nuevo que nunca lo concedió" —la app no puede saber que un día lo
+  tuvo—. No correr degradada en silencio no depende de recordar nada.
+- **La pérdida en caliente se avisa y se anota en la bitácora.** Cuando el
+  permiso estaba y desaparece —HyperOS revocándolo, o el usuario quitándolo— sí
+  hay una transición demostrable, y eso merece una notificación propia.
+
+Se avisa del cambio de estado, nunca del estado: escribir cada 60 s que sigue
+sin permiso enterraría en la bitácora lo que sí importa. Y **no se avisa a quien
+nunca lo concedió**: el acceso a notificaciones es opcional, la app funciona sin
+él, e insistirle a quien dijo que no sería acoso. La notificación permanente lo
+dice sin insistir, que es distinto.
 
 ### Fase 2 · Durante
 
@@ -336,7 +374,10 @@ Estructura preparada, contenido pendiente. Se desarrollarán después del sismo.
 Datos duros que condicionan cualquier diseño. Las fechas indican cuándo se midió, porque la vigencia del dato depende de ello.
 
 **Latencia del feed del USGS** *(medido 2026-08-12)*
-Mediana de publicación 3,6 min; el evento más reciente presente en el feed tenía 4,9 min; piso práctico ~2 min. Sumando el sondeo de la app, el total real es de **4 a 7 minutos** desde que ocurre el sismo.
+Mediana de publicación 3,6 min; el evento más reciente presente en el feed tenía 4,9 min; piso práctico ~2 min. Sumando el sondeo de la app, el total real es de **4 a 7 minutos** desde que ocurre el sismo. **Esa medida es global y no vale para Colombia:** el M5.4 de Rioblanco (2026-11-03, 04:13 hora local) tuvo su versión revisada en el USGS a los **19 minutos** del origen, y su primera versión automática no se puede ver porque la sobrescribe la revisada. Lo medido en Colombia manda sobre la mediana global.
+
+**Primera alerta real de Google** *(2026-11-03)*
+El M5.4 de Rioblanco, a ~300 km, llegó por `eew_alert_v2` a los **20 s** del origen y su actualización por `eew_update` a los 4 min. La app lo vio completo, pero ninguna regla del feed lo clasifica como alerta (no es ≥M6, no trae `mmi`, su profundidad es de 10 km), y el sensor no cruzó el umbral de sacudida (que sigue sin calibrar). Es el tipo de caso que el acelerómetro existe para contrastar con lo que dice Google, aunque aquí no se puede afirmar que Google se equivocara.
 
 **Ventana física disponible en Medellín** *(calculado sobre 148 sismos M4.0+ de 12 meses)*
 La onda S llega entre **23 y 58 segundos** en los sismos que importan. El M7.4 a 172 km y 110 km de profundidad dio 58 s. **La app llega entre 5 y 15 veces más tarde que el ancho completo de la ventana**, por lo que ninguna mejora sobre un feed HTTP la cierra. La única vía a los segundos es la alerta de Google.
@@ -438,6 +479,21 @@ descartado que HyperOS lo bloquee, que era un riesgo abierto. Lo que **no** se p
 verificar es el interruptor maestro de las Alertas de Terremotos de Google: sigue
 guardado por Play Services en preferencias no legibles sin root.
 
+**Ni la app ni el fork pueden hacer visible el teléfono ni emparejarlo con nadie** *(revisado en código y en el equipo)*
+Ninguno de los dos pide `ACTION_REQUEST_DISCOVERABLE` ni crea vínculos: la app
+solo anuncia por BLE y el fork solo escanea con filtro de UUID de servicio y
+conecta por `TRANSPORT_LE`, así que no puede tocar un dispositivo clásico. La
+**única** ventana en que el teléfono queda visible durante las pruebas la abre
+el propio sistema: con la pantalla de Bluetooth de Ajustes abierta —que es justo
+lo que hay que hacer para comprobar que la baliza aparece en la lista— el
+adaptador pasa a `SCAN_MODE_CONNECTABLE_DISCOVERABLE` y acepta emparejamientos.
+Conviene cerrarla en cuanto se lea el nombre.
+
+Que la baliza se anuncie como **conectable** es deliberado y no es esa ventana:
+sin ello no sale en la lista normal de Bluetooth, que es toda su razón de ser.
+La app no expone ningún servidor GATT, así que lo único legible es el nombre,
+que es lo que se quiere publicar.
+
 **MIUI / HyperOS mata servicios en segundo plano de forma agresiva.** Para que el monitoreo sobreviva, la app requiere autoarranque activado, batería sin restricciones y estar fijada en la pantalla de recientes. Sin eso ninguna app de monitoreo sobrevive en un Xiaomi, y el vigilante solo puede reparar el daño después de producido.
 
 ### Hallazgos sobre bitchat
@@ -518,6 +574,19 @@ de poder leerla. Al terminar, volver a la versión no depurable.
 **Al instalar el fork:** conserva el mismo `applicationId` (`com.bitchat.droid`), así que Android rechaza instalarlo encima del de Play Store y hay que desinstalar ese primero, perdiendo su identidad e historial. Ya está hecho en el equipo de referencia.
 
 En Xiaomi la instalación por cable falla con `INSTALL_FAILED_USER_RESTRICTED` **si la pantalla está bloqueada**. No es un problema del paquete: basta con desbloquearla.
+
+**Reinstalar Alerta Sismo borra su acceso a notificaciones**, y con él la escucha
+de la alerta de Google. Hay que volver a concederlo después de cada
+desinstalación, o la prueba mide una app sin su fuente rápida sin que nada lo
+delate. Comprobarlo desde el equipo de desarrollo:
+
+```
+adb shell settings get secure enabled_notification_listeners
+adb shell dumpsys notification | grep -A20 "Live notification listeners"
+```
+
+La primera línea dice si está **concedido**; la segunda, si el sistema llegó a
+**vincular** el servicio. Son cosas distintas y hacen falta las dos.
 
 **Verificaciones en el equipo de referencia, pendientes:**
 

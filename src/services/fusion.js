@@ -9,7 +9,7 @@
 // app y no de ninguno de los dos.
 
 import { alMedir, guardarUltimaMedicion, drenarMediciones } from './sismografo';
-import { drenarAlertas, registrarAlertaGoogle } from './escucha';
+import { drenarAlertas, registrarAlertaGoogle, vigilarPermisoEscucha } from './escucha';
 import { registrarFuente, cerrarSiVencio, marcarAlarmado } from './episodio';
 
 let listo = false;
@@ -74,6 +74,9 @@ async function procesarMedicion(m) {
 async function procesarAlertaGoogle(alerta) {
   const { episodio } = await registrarFuente('google', {
     recibidoEn: alerta.recibidoEn,
+    // Alerta y actualizacion son observaciones distintas del mismo sismo; la
+    // misma notificacion repetida comparte version y no se duplica.
+    version: `${alerta.canal}:${alerta.recibidoEn}`,
     canal: alerta.canal,
     titulo: alerta.titulo,
     texto: alerta.texto,
@@ -135,6 +138,17 @@ export async function mantenimientoFusion() {
   } catch (e) {
     console.log('No se pudieron vaciar los buzones nativos:', e);
   }
+
+  // Que la via rapida siga viva se comprueba aqui y no en la pantalla de
+  // configuracion, porque el usuario no abre esa pantalla y el permiso se cae
+  // solo. Va despues de los buzones: si acaba de llegar una alerta, procesarla
+  // importa mas que auditar el permiso.
+  try {
+    await vigilarPermisoEscucha();
+  } catch (e) {
+    console.log('No se pudo comprobar el permiso de la escucha de Google:', e);
+  }
+
   try {
     return await cerrarSiVencio();
   } catch (e) {

@@ -19,7 +19,6 @@
 // WorkManager se esta ejecutando, la tarea ya esta registrada por definicion.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { iniciarServicioPrimerPlano, LATIDO_KEY } from './foreground';
-import { registrarEvento, TIPO } from './bitacora';
 
 /**
  * El bucle late cada 60 s con red y cada 5 min hibernando. El umbral debe
@@ -64,14 +63,7 @@ export async function asegurarMonitoreoVivo(origen = 'desconocido') {
   // hay una actividad visible— siempre esta permitida.
   const ok = await iniciarServicioPrimerPlano();
 
-  await registrarEvento({
-    tipo: TIPO.SISTEMA,
-    subtipo: ok ? 'monitoreo_revivido' : 'monitoreo_no_revivido',
-    origen,
-    detalle: ok
-      ? 'El servicio de monitoreo estaba detenido y se reinició automáticamente.'
-      : 'El servicio estaba detenido y Android rechazó reiniciarlo desde segundo plano. Abre la app para restablecerlo.',
-  });
-
+  // Revivir el monitoreo no se anota en la bitacora: es un hecho de la app, no
+  // de un sismo.
   return { revisado: true, revivido: ok, motivo: ok ? undefined : 'arranque_rechazado' };
 }

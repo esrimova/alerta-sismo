@@ -19,7 +19,7 @@ import { registrarResultado } from './health';
 import { cargarUbicacionGuardada } from './location';
 import { iniciarCuentaAtras } from './emergencia';
 import { registrarEvento, TIPO } from './bitacora';
-import { registrarFuente, marcarAlarmado } from './episodio';
+import { registrarFuente, marcarAlarmado, episodioAbierto, TOLERANCIA_MS } from './episodio';
 import { medir, vigilarReplicas } from './sismografo';
 
 /** Ventana para reglas de evento unico. Independiente de la de enjambre. */
@@ -239,6 +239,51 @@ export function construirEntradaAlerta({
 }
 
 /**
+ * Suma al episodio abierto lo que el USGS sabe de ese sismo, aunque ninguna
+ * regla lo considere una alerta.
+ *
+ * Sin esto, un sismo que Google avisa y que las reglas no clasifican (el M5.4 de
+ * Rioblanco: ni >=M6, ni mmi, ni somero) deja el episodio con "USGS aun no
+ * confirma" para siempre, cuando el feed si lo tiene. Aqui solo se REGISTRA: no
+ * suena, no abre protocolo ni ventana de medida. Cada version nueva del USGS
+ * (automatica, revisada) es una observacion mas; una ya vista no se repite, o
+ * el sondeo de cada minuto le reescribiria la hora de llegada.
+ */
+async function vincularUsgsAlEpisodio(events, settings, zona) {
+  const ep = await episodioAbierto();
+  if (!ep) return;
+
+  for (const ev of events) {
+    const p = ev.properties || {};
+    if (p.time == null) continue;
+    if (Math.abs(p.time - ep.origenEstimado) > TOLERANCIA_MS) continue;
+
+    const distancia = getDistanceFromLatLonInKm(
+      zona.lat, zona.lon, ev.geometry.coordinates[1], ev.geometry.coordinates[0]
+    );
+    // El mismo filtro de cercania de las reglas: coincidir en la hora con un
+    // sismo en Japon no lo convierte en este.
+    if (distancia > alcanceKm(p.mag || 0, zona.radio)) continue;
+
+    const version = `${ev.id}:${p.updated ?? ''}`;
+    if ((ep.fuentes.usgs?.observaciones || []).some((o) => o.version === version)) continue;
+
+    await registrarFuente('usgs', {
+      recibidoEn: Date.now(),
+      origenEstimado: p.time,
+      eventoId: ev.id,
+      version,
+      mag: p.mag ?? null,
+      status: p.status ?? null,
+      nivel: null,
+      entrada: construirEntradaAlerta({
+        nivel: null, regla: null, evento: ev, distancia, zona, settings, acciones: null,
+      }),
+    });
+  }
+}
+
+/**
  * Un ciclo completo. Devuelve un resumen para que quien lo llame decida.
  */
 export async function ejecutarCiclo() {
@@ -253,21 +298,12 @@ export async function ejecutarCiclo() {
   // indistinguible de un dia tranquilo: la app callaba creyendo que todo bien.
   const { debeAvisarCaida, debeAvisarRecuperacion } = await registrarResultado(resultado);
   if (debeAvisarCaida) {
+    // Solo notificacion: la caida del feed es un hecho de la app, no un sismo, y
+    // el semaforo ya la refleja.
     await notificarServicioCaido(resultado.error || 'Causa desconocida.');
-    registrarEvento({
-      tipo: TIPO.SERVICIO,
-      subtipo: 'caido',
-      motivo: resultado.motivo || null,
-      detalle: resultado.error || 'Causa desconocida.',
-    });
   }
   if (debeAvisarRecuperacion) {
     await notificarServicioRestablecido();
-    registrarEvento({
-      tipo: TIPO.SERVICIO,
-      subtipo: 'restablecido',
-      detalle: 'La app volvió a recibir información sísmica del USGS.',
-    });
   }
 
   if (!resultado.ok) return { ok: false, alerta: null };
@@ -276,6 +312,12 @@ export async function ejecutarCiclo() {
   const { nivel, regla, evento, distancia, zona, detalleEnjambre } = evaluarReglas(
     resultado.events, settings, Date.now(), ubicacionAuto
   );
+  try {
+    await vincularUsgsAlEpisodio(resultado.events, settings, zona);
+  } catch (e) {
+    console.log('No se pudo vincular el USGS al episodio:', e);
+  }
+
   if (!nivel || !evento) return { ok: true, alerta: null };
 
   const lastEventId = await AsyncStorage.getItem('lastEventId');
@@ -294,6 +336,9 @@ export async function ejecutarCiclo() {
     recibidoEn: Date.now(),
     origenEstimado: evento.properties.time,
     eventoId: evento.id,
+    version: `${evento.id}:${evento.properties.updated ?? ''}`,
+    mag: evento.properties.mag ?? null,
+    status: evento.properties.status ?? null,
     nivel,
     entrada,
   });

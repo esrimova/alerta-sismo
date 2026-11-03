@@ -55,10 +55,12 @@ export const TOLERANCIA_MS = 120 * 1000;
 /**
  * Cuanto se mantiene abierto un episodio esperando fuentes rezagadas.
  *
- * El maximo observado del USGS es ~7 minutos; 15 deja margen sin dejar el
- * episodio abierto tanto tiempo que se coma la siguiente replica.
+ * El USGS tarda para Colombia bastante mas que los 4-7 minutos globales: la
+ * version revisada del M5.4 de Rioblanco salio a los 19 minutos. 45 da margen
+ * para esa revision. No arriesga comerse la siguiente replica porque un sismo
+ * con otro origen cierra el episodio en cuanto llega (ver registrarFuente).
  */
-export const VIDA_MS = 15 * 60 * 1000;
+export const VIDA_MS = 45 * 60 * 1000;
 
 /**
  * Cola de escritura, por el mismo motivo que en la bitacora: el bucle del
@@ -157,7 +159,21 @@ export function registrarFuente(fuente, datos) {
       nuevo = true;
     }
 
-    ep.fuentes[fuente] = { ...datos, recibidoEn: ahora, origenEstimado: origen };
+    // UNA FUENTE PUEDE HABLAR VARIAS VECES y ninguna pisa a la anterior: Google
+    // manda la alerta y minutos despues una actualizacion; el USGS publica una
+    // version automatica y luego la revisada. La entrada de la fuente es la
+    // PRIMERA observacion —es la que mide la rapidez, que es lo que importa—, y
+    // `observaciones` guarda todas en orden. Si llega otra con la misma
+    // `version` se trata de la misma observacion repetida y se completa, no se
+    // duplica.
+    const obs = { ...datos, recibidoEn: ahora, origenEstimado: origen };
+    const lista = ep.fuentes[fuente]?.observaciones || [];
+    const repetida = obs.version != null
+      ? lista.findIndex((o) => o.version === obs.version)
+      : -1;
+    if (repetida >= 0) lista[repetida] = { ...lista[repetida], ...obs };
+    else lista.push(obs);
+    ep.fuentes[fuente] = { ...lista[0], observaciones: lista };
 
     // El USGS manda sobre la hora del sismo: la trae medida, no estimada. En
     // cuanto llega, todos los desfases se recalculan contra ella y dejan de ser
@@ -273,9 +289,19 @@ async function consolidarInterno(ep) {
     origenExacto: ep.origenExacto,
     acciones: ep.acciones || entradaUsgs.acciones || null,
     fuentes: {
-      google: g ? { ...g, entrada: undefined } : null,
-      sensor: s ? { ...s, entrada: undefined } : null,
-      usgs: ep.fuentes.usgs ? { recibidoEn: ep.fuentes.usgs.recibidoEn } : null,
+      google: g ? limpiarFuente(g) : null,
+      sensor: s ? limpiarFuente(s) : null,
+      usgs: ep.fuentes.usgs
+        ? {
+            recibidoEn: ep.fuentes.usgs.recibidoEn,
+            observaciones: (ep.fuentes.usgs.observaciones || []).map((o) => ({
+              recibidoEn: o.recibidoEn,
+              version: o.version ?? null,
+              mag: o.mag ?? o.entrada?.sismo?.mag ?? null,
+              status: o.status ?? o.entrada?.sismo?.status ?? null,
+            })),
+          }
+        : null,
     },
     desfases: ep.desfases || calcularDesfases(ep),
     // Resumen legible para la fila colapsada, sobre todo cuando el USGS nunca
@@ -291,6 +317,15 @@ async function consolidarInterno(ep) {
   }
   await escribir(null);
   return entrada;
+}
+
+/** Quita el bulto de `entrada` de la fuente y de cada una de sus observaciones. */
+function limpiarFuente(f) {
+  return {
+    ...f,
+    entrada: undefined,
+    observaciones: (f.observaciones || []).map((o) => ({ ...o, entrada: undefined })),
+  };
 }
 
 /** El ultimo episodio cerrado. Para la tarjeta de la pantalla principal. */

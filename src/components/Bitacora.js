@@ -33,7 +33,9 @@ const NIVEL_VISUAL = {
 const TIPO_VISUAL = {
   [TIPO.PROTOCOLO]: { icono: '🆘', nombre: 'Protocolo de emergencia', color: '#F97316' },
   [TIPO.RED]: { icono: '🌐', nombre: 'Conectividad', color: '#38BDF8' },
-  [TIPO.SERVICIO]: { icono: '📡', nombre: 'Servicio USGS', color: '#A78BFA' },
+  // No dice "USGS" porque aqui cae tambien la escucha de Google al quedarse
+  // sin permiso, y esa es la fuente rapida. Cual fue lo dice el detalle.
+  [TIPO.SERVICIO]: { icono: '📡', nombre: 'Fuente de datos', color: '#A78BFA' },
   [TIPO.SISTEMA]: { icono: '⚙️', nombre: 'Sistema', color: '#64748B' },
 };
 

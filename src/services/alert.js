@@ -153,6 +153,55 @@ export const notificarServicioRestablecido = async () => {
 };
 
 /**
+ * La escucha de la alerta de Google se quedo sin permiso.
+ *
+ * Es la perdida mas silenciosa que puede sufrir la app: no falla nada, no se
+ * cae ningun servicio y el monitoreo sigue corriendo igual. Lo unico que pasa
+ * es que la via rapida —los ~18 s de Google— desaparece y solo queda el feed,
+ * que llega de 4 a 7 minutos tarde. Sin este aviso el usuario se entera al
+ * abrir la pantalla de configuracion, o no se entera.
+ *
+ * Se avisa SOLO cuando el permiso se pierde habiendolo tenido. Nunca porque no
+ * se haya concedido: el acceso a notificaciones es opcional, la app funciona
+ * sin el, e insistirle a quien dijo que no seria acoso.
+ */
+export const notificarEscuchaPerdida = async () => {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '⚠️ Sin las alertas de Google',
+        body: 'La app perdió el acceso a notificaciones. Los avisos llegarán '
+          + 'minutos más tarde, no en segundos. Vuelve a concederlo en Configuración.',
+        sound: false,
+        priority: Notifications.AndroidNotificationPriority.DEFAULT,
+        data: { tipo: 'servicio' },
+      },
+      trigger: null,
+    });
+  } catch (e) {
+    console.log('No se pudo notificar la perdida de la escucha:', e);
+  }
+};
+
+/** La escucha de Google vuelve a tener permiso, o lo tiene por primera vez. */
+export const notificarEscuchaActiva = async () => {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '✅ Alertas de Google activas',
+        body: 'La app ya escucha la alerta sísmica de Google.',
+        sound: false,
+        priority: Notifications.AndroidNotificationPriority.DEFAULT,
+        data: { tipo: 'servicio' },
+      },
+      trigger: null,
+    });
+  } catch (e) {
+    console.log('No se pudo notificar la recuperacion de la escucha:', e);
+  }
+};
+
+/**
  * Reproduce la alarma. Reemplaza a Audio.Sound de expo-av, que fue
  * eliminado en el SDK 57 y provocaba UnsatisfiedLinkError al arrancar.
  */
